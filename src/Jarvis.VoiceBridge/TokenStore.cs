@@ -49,7 +49,12 @@ internal sealed class TokenStore(Uri server, string? folder = null)
             return;
         }
 
-        System.IO.File.Delete(File(key));
+        // File.Delete throws when the folder is missing, i.e. --logout before the first sign-in.
+        var file = File(key);
+        if (System.IO.File.Exists(file))
+        {
+            System.IO.File.Delete(file);
+        }
     }
 
     private string Account(string key) => $"{server.Authority}:{key}";
