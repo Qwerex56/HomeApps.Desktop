@@ -9,7 +9,9 @@ namespace Jarvis.VoiceBridge;
 /// utterance streams to the server until the person is quiet; then the microphone is ignored while the server answers
 /// and JARVIS speaks. When he asks "tak czy nie?", the next answer is recorded without the wake word.
 /// </summary>
-internal sealed class Bridge(BridgeOptions options, WakeWord wake, IAccessToken login, VoiceLink link, Microphone microphone) : IDisposable
+internal sealed class Bridge(
+    BridgeOptions options, WakeWord wake, IAccessToken login, VoiceLink link, Microphone microphone, IBridgeOutput output)
+    : IDisposable
 {
     private static readonly TimeSpan WaitAfterWake = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan WaitForAnswer = TimeSpan.FromSeconds(8);
@@ -20,15 +22,18 @@ internal sealed class Bridge(BridgeOptions options, WakeWord wake, IAccessToken 
     private List<short>? _recording;
     private bool _awaiting;
     private bool _resetWake;
+    private bool _muted;
     private CancellationTokenSource _playing = new();
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         using var quit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         await ConnectAsync(quit.Token);
-        Console.WriteLine($"Mikrofon: {microphone.Name}. Powiedz „Hey Jarvis” albo naciśnij Enter; q kończy.");
+        Console.WriteLine(options.Ipc
+            ? $"Mikrofon: {microphone.Name}."
+            : $"Mikrofon: {microphone.Name}. Powiedz „Hey Jarvis” albo naciśnij Enter; q kończy.");
         var events = EventsAsync(quit.Token);
-        var keys = Task.Run(() => KeysAsync(quit), quit.Token);
+        var keys = options.Ipc ? CommandsAsync(quit) : Task.Run(() => KeysAsync(quit), quit.Token);
         try
         {
             await foreach (var frame in microphone.Frames.ReadAllAsync(quit.Token))
@@ -56,6 +61,11 @@ internal sealed class Bridge(BridgeOptions options, WakeWord wake, IAccessToken 
         await _gate.WaitAsync(cancellationToken);
         try
         {
+            if (_muted)
+            {
+                return;
+            }
+
             switch (_state)
             {
                 case BridgeState.Waiting:
@@ -103,6 +113,7 @@ internal sealed class Bridge(BridgeOptions options, WakeWord wake, IAccessToken 
         _state = state;
         _speech = new EndOfSpeech(state == BridgeState.Answering ? WaitForAnswer : WaitAfterWake);
         _recording = options.SaveRecordings is null ? null : [];
+        output.State(BridgeStates.Listening);
         await Speaker.PlayAsync(Chime.Listening, cancellationToken);
         microphone.Drain();
         await link.StartAsync(cancellationToken);
@@ -113,6 +124,7 @@ internal sealed class Bridge(BridgeOptions options, WakeWord wake, IAccessToken 
     {
         await link.StopAsync(cancellationToken);
         _state = BridgeState.Busy;
+        output.State(BridgeStates.Thinking);
         _ = Speaker.PlayAsync(Chime.Heard, cancellationToken);
         if (_recording is { Count: > 0 } recording && options.SaveRecordings is { } folder)
         {
@@ -129,6 +141,7 @@ internal sealed class Bridge(BridgeOptions options, WakeWord wake, IAccessToken 
         _state = BridgeState.Waiting;
         _awaiting = false;
         _resetWake = true;
+        output.State(_muted ? BridgeStates.Muted : BridgeStates.Idle);
     }
 
     private async Task EventsAsync(CancellationToken cancellationToken)
@@ -151,31 +164,22 @@ internal sealed class Bridge(BridgeOptions options, WakeWord wake, IAccessToken 
         switch (said.Type)
         {
             case "transcript":
-                var heard = said.Text("text");
-                Console.WriteLine(string.IsNullOrWhiteSpace(heard) ? "Ty: (nic nie usłyszałem)" : $"Ty: {heard}");
+                output.Heard(said.Text("text"));
                 break;
             case "reply":
-                Console.WriteLine($"JARVIS: {said.Text("text")}");
-                if (said.Json.TryGetProperty("actions", out var actions))
-                {
-                    foreach (var action in actions.EnumerateArray())
-                    {
-                        Console.WriteLine($"  [{action.GetProperty("status").GetString()}] {action.GetProperty("description").GetString()}");
-                    }
-                }
-
+                output.Reply(
+                    said.Text("text") ?? string.Empty,
+                    said.Json.TryGetProperty("actions", out var actions)
+                        ? actions.EnumerateArray()
+                            .Select(a => new ReplyAction(
+                                a.GetProperty("status").GetString() ?? string.Empty,
+                                a.GetProperty("description").GetString() ?? string.Empty))
+                            .ToList()
+                        : []);
                 _awaiting = said.Flag("awaiting");
                 break;
             case "audio" when said.Wav is { } wav:
-                try
-                {
-                    await Speaker.PlayAsync(wav, _playing.Token);
-                }
-                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-                {
-                    // Enter stopped him.
-                }
-
+                await SpeakAsync(wav, cancellationToken);
                 break;
             case "done":
                 await UnderGateAsync(async () =>
@@ -187,7 +191,7 @@ internal sealed class Bridge(BridgeOptions options, WakeWord wake, IAccessToken 
 
                     if (_awaiting && !said.Flag("cancelled"))
                     {
-                        Console.WriteLine("(tak / nie?)");
+                        output.Confirm();
                         await BeginAsync(BridgeState.Answering, cancellationToken);
                     }
                     else
@@ -197,7 +201,7 @@ internal sealed class Bridge(BridgeOptions options, WakeWord wake, IAccessToken 
                 }, cancellationToken);
                 break;
             case "error":
-                Console.WriteLine($"Błąd serwera: {said.Text("code")} {said.Text("detail")}".TrimEnd());
+                output.Error(said.Text("code"), said.Text("detail"));
                 await UnderGateAsync(() => { BackToWaiting(); return Task.CompletedTask; }, cancellationToken);
                 break;
             case "closed" when !cancellationToken.IsCancellationRequested:
@@ -244,13 +248,129 @@ internal sealed class Bridge(BridgeOptions options, WakeWord wake, IAccessToken 
                 await FinishAsync(cancellationToken);
                 break;
             case BridgeState.Busy:
-                await _playing.CancelAsync();
-                _playing.Dispose();
-                _playing = new CancellationTokenSource();
+                await InterruptAsync(cancellationToken);
+                break;
+        }
+    }
+
+    /// <summary>Under the gate: JARVIS stops speaking and the server drops the turn.</summary>
+    private async Task InterruptAsync(CancellationToken cancellationToken)
+    {
+        await _playing.CancelAsync();
+        _playing.Dispose();
+        _playing = new CancellationTokenSource();
+        await link.CancelAsync(cancellationToken);
+        Console.WriteLine("(przerwane)");
+        BackToWaiting();
+    }
+
+    /// <summary>Plays one sentence of the answer; with <c>--ipc</c> its loudness goes out for the hologram's pulse.</summary>
+    private async Task SpeakAsync(byte[] wav, CancellationToken cancellationToken)
+    {
+        output.State(BridgeStates.Speaking);
+        using var pulse = CancellationTokenSource.CreateLinkedTokenSource(_playing.Token);
+        var levels = options.Ipc ? PulseAsync(Loudness.Windows(wav), pulse.Token) : Task.CompletedTask;
+        try
+        {
+            await Speaker.PlayAsync(wav, _playing.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Enter or "stop" stopped him.
+        }
+        finally
+        {
+            await pulse.CancelAsync();
+            await levels;
+            output.Level(0);
+            if (_state == BridgeState.Busy)
+            {
+                output.State(BridgeStates.Thinking);
+            }
+        }
+    }
+
+    private async Task PulseAsync(double[] levels, CancellationToken cancellationToken)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            while (clock.Elapsed / Loudness.Window is var at && at < levels.Length)
+            {
+                output.Level(levels[(int)at]);
+                await Task.Delay(Loudness.Window, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // He stopped speaking.
+        }
+    }
+
+    /// <summary><c>--ipc</c>: commands from the hologram app, one JSON line each; stdin closing means quit.</summary>
+    private async Task CommandsAsync(CancellationTokenSource quit)
+    {
+        try
+        {
+            while (!quit.IsCancellationRequested && await Console.In.ReadLineAsync(quit.Token) is { } line)
+            {
+                var command = IpcCommands.Parse(line);
+                switch (command)
+                {
+                    case IpcCommand.Quit:
+                        await quit.CancelAsync();
+                        return;
+                    case IpcCommand.Talk:
+                        await UnderGateAsync(() => OnEnterAsync(quit.Token), quit.Token);
+                        break;
+                    case IpcCommand.Stop:
+                        await UnderGateAsync(() => OnStopAsync(quit.Token), quit.Token);
+                        break;
+                    case IpcCommand.Mute or IpcCommand.Unmute:
+                        await UnderGateAsync(() => OnMuteAsync(command == IpcCommand.Mute, quit.Token), quit.Token);
+                        break;
+                    default:
+                        output.Error("ipc.unknown_command", line);
+                        break;
+                }
+            }
+
+            await quit.CancelAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // Quitting.
+        }
+    }
+
+    /// <summary>"stop": drop what is being recorded, or stop JARVIS mid-answer.</summary>
+    private async Task OnStopAsync(CancellationToken cancellationToken)
+    {
+        switch (_state)
+        {
+            case BridgeState.Recording or BridgeState.Answering:
                 await link.CancelAsync(cancellationToken);
-                Console.WriteLine("(przerwane)");
+                _recording = null;
                 BackToWaiting();
                 break;
+            case BridgeState.Busy:
+                await InterruptAsync(cancellationToken);
+                break;
+        }
+    }
+
+    private async Task OnMuteAsync(bool mute, CancellationToken cancellationToken)
+    {
+        _muted = mute;
+        if (mute && _state is BridgeState.Recording or BridgeState.Answering)
+        {
+            await link.CancelAsync(cancellationToken);
+            _recording = null;
+            BackToWaiting();
+        }
+        else if (_state == BridgeState.Waiting)
+        {
+            BackToWaiting();
         }
     }
 
@@ -269,12 +389,14 @@ internal sealed class Bridge(BridgeOptions options, WakeWord wake, IAccessToken 
 
     private async Task ConnectAsync(CancellationToken cancellationToken)
     {
+        output.State(BridgeStates.Connecting);
         while (true)
         {
             try
             {
                 await link.ConnectAsync(await login.AccessTokenAsync(cancellationToken), cancellationToken);
                 Console.WriteLine($"Połączono z {options.Server.Host}.");
+                output.State(_muted ? BridgeStates.Muted : BridgeStates.Idle);
                 return;
             }
             catch (Exception exception) when (exception is HttpRequestException or WebSocketException or JsonException)

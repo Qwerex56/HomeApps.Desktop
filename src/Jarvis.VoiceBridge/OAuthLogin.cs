@@ -13,7 +13,7 @@ namespace Jarvis.VoiceBridge;
 /// registers itself once, opens the browser for "Zezwól" with PKCE and a loopback redirect, and then lives on the
 /// refresh token. It shows up in "Połączone aplikacje", where it can be disconnected.
 /// </summary>
-internal sealed class OAuthLogin(HttpClient http, BridgeOptions options, TokenStore store) : IAccessToken
+internal sealed class OAuthLogin(HttpClient http, BridgeOptions options, TokenStore store, IBridgeOutput output) : IAccessToken
 {
     private const string ClientKey = "client_id";
     private const string RefreshKey = "refresh_token";
@@ -74,8 +74,7 @@ internal sealed class OAuthLogin(HttpClient http, BridgeOptions options, TokenSt
         using var listener = new HttpListener();
         listener.Prefixes.Add($"http://127.0.0.1:{port}/");
         listener.Start();
-        Console.WriteLine("Otwieram przeglądarkę: zaloguj się w HomeApps i kliknij „Zezwól”. Jeśli się nie otworzyła:");
-        Console.WriteLine(authorize);
+        output.Login(authorize);
         Open(authorize);
 
         var context = await listener.GetContextAsync().WaitAsync(TimeSpan.FromMinutes(5), cancellationToken);
