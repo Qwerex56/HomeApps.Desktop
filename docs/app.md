@@ -1,4 +1,4 @@
-# The JARVIS app (S-2c, S-2d)
+# The JARVIS app (S-2c to S-2f)
 
 `app/` is a Godot 4.7 project (GDScript, GL Compatibility): JARVIS's face on the computer. It does no listening or
 talking itself; it starts the bridge with `--ipc` ([bridge.md](bridge.md)) and shows what the bridge reports.
@@ -18,7 +18,7 @@ talking itself; it starts the bridge with `--ipc` ([bridge.md](bridge.md)) and s
 - **Settings (S-2e):** `~/.homeapps/hologram/settings.cfg`, written with the defaults from
   `data/settings/bridge_settings.tres` on the first run: server, dev certificate, local speech and its engine
   (on by default, S1: Speaches on `localhost:8000`), the computer's name, the bridge's path and extra arguments.
-  "Ustawienia…" in the menu shows the file in Finder; "Uruchom ponownie" starts the bridge again with your edits.
+  An exported app's first file points at `https://home-apps.dev` instead. "Ustawienia…" in the menu shows the file in Finder; "Uruchom ponownie" starts the bridge again with your edits.
 - **Account (S-2e):** the bridge signs in in the browser (OAuth with PKCE) and shows up in "Połączone aplikacje" as
   "JARVIS na komputerze", and in Konto → Komputery as this computer (`--link`). "Zaloguj ponownie" forgets the login
   (and a satellite pairing) on this computer and signs in again.
@@ -40,5 +40,26 @@ The first time, the bridge opens the browser to sign in (or uses `--pair` from t
 starts whatever the bridge is paired as). The defaults point at `https://app.localhost`; for production change
 `server` and turn `allows_dev_certificate` off in `~/.homeapps/hologram/settings.cfg`.
 
-Known limits: on macOS the app still has a Dock icon while run from the editor (`LSUIElement` comes with the export,
-S-2f); on Linux with Wayland "always on top" and transparency may not work (S8).
+## Package (S-2f)
+
+Both need .NET 10 and Godot 4.7 with its export templates (Editor → Manage Export Templates → Download, once).
+The bridge goes in self-contained, so the person installing it needs no .NET.
+
+```bash
+scripts/package-macos.sh     # build/macos/JARVIS.app (Apple silicon), GODOT=/path/to/Godot for another Godot
+scripts/package-linux.sh     # build/linux/jarvis-linux-x86_64.tar.gz, GODOT=godot by default
+```
+
+- **macOS:** the bridge sits in `JARVIS.app/Contents/Resources/bridge`. The script sets `LSUIElement` (no Dock
+  icon, only the menu-bar icon) and the microphone question, then signs everything ad hoc: no Apple Developer account,
+  so on another Mac the first start is right-click → Otwórz. Copy it to `/Applications`. macOS asks for the
+  microphone on the first "Hey Jarvis" listening, on behalf of JARVIS (the bridge is its child process).
+- **Linux:** unpack anywhere, e.g. `~/.local/share/jarvis`, and run `jarvis/jarvis.x86_64`; the bridge sits in
+  `jarvis/bridge`. Playing sound needs `aplay` (alsa-utils).
+- **Start at login:** "Uruchamiaj przy logowaniu" in the menu writes a LaunchAgent
+  (`~/Library/LaunchAgents/dev.home-apps.jarvis.plist`) or an XDG entry (`~/.config/autostart/jarvis.desktop`) for
+  the app where it is now; untick it before moving the app. Greyed out when run from the editor.
+- **Windows:** later (S8).
+
+Known limits: run from the editor the app still has a Dock icon (only the package sets `LSUIElement`); on Linux
+with Wayland "always on top" and transparency may not work (S8).
