@@ -11,7 +11,7 @@ script = ExtResource("1_tray")
 
 [node name="Menu" type="PopupMenu" parent="."]
 prefer_native_menu = true
-item_count = 4
+item_count = 8
 item_0/text = "Mów"
 item_0/id = 0
 item_1/text = "Wycisz mikrofon"
@@ -19,5 +19,13 @@ item_1/checkable = 1
 item_1/id = 1
 item_2/id = 2
 item_2/separator = true
-item_3/text = "Wyjdź"
+item_3/text = "Ustawienia…"
 item_3/id = 3
+item_4/text = "Uruchom ponownie"
+item_4/id = 4
+item_5/text = "Zaloguj ponownie"
+item_5/id = 5
+item_6/id = 6
+item_6/separator = true
+item_7/text = "Wyjdź"
+item_7/id = 7

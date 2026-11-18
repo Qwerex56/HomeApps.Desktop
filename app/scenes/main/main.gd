@@ -5,6 +5,7 @@ extends Node
 const BridgeProcess := preload("res://common/components/bridge_process/bridge_process.gd")
 const Tray := preload("res://scenes/tray/tray.gd")
 const Hologram := preload("res://scenes/hologram/hologram.gd")
+const Settings := preload("res://resources/bridge_settings.gd")
 
 const SCREEN_MARGIN: int = 24
 
@@ -23,6 +24,9 @@ func _ready() -> void:
 	_bridge.login_requested.connect(_on_login_requested)
 	_tray.talk_requested.connect(_bridge.send.bind("talk"))
 	_tray.mute_toggled.connect(_on_mute_toggled)
+	_tray.settings_requested.connect(_on_settings_requested)
+	_tray.restart_requested.connect(_bridge.restart)
+	_tray.logout_requested.connect(_bridge.log_out)
 	_tray.quit_requested.connect(_on_quit_requested)
 	_bridge.start()
 
@@ -51,6 +55,11 @@ func _on_login_requested(_url: String) -> void:
 
 func _on_mute_toggled(is_muted: bool) -> void:
 	_bridge.send("mute" if is_muted else "unmute")
+
+
+func _on_settings_requested() -> void:
+	# Shown in Finder (or the file manager) rather than opened: a .cfg may have no app to open it.
+	OS.shell_show_in_file_manager(Settings.user_file_path())
 
 
 func _on_quit_requested() -> void:

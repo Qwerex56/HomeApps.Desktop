@@ -12,12 +12,13 @@ talking itself; it starts the bridge with `--ipc` ([bridge.md](bridge.md)) and s
   `scenes/hologram/hologram_preview.tscn` (F6): it plays a whole turn in a loop with a fake voice level.
 - **Subtitles:** under the orb, what JARVIS heard (`heard`, dimmer) and then his answer (`reply`), at most 4 lines;
   cleared when a new turn starts. Turn them off with `shows_captions` on the Hologram node.
-- **Menu-bar icon:** a left click is "Mów" (like Enter); the menu has Mów, Wycisz mikrofon and Wyjdź. The tooltip
+- **Menu-bar icon:** a left click is "Mów" (like Enter); the menu has Mów, Wycisz mikrofon, Ustawienia…, Uruchom
+  ponownie, Zaloguj ponownie and Wyjdź. The tooltip
   says what JARVIS is doing, or what is wrong.
 - **Settings (S-2e):** `~/.homeapps/hologram/settings.cfg`, written with the defaults from
   `data/settings/bridge_settings.tres` on the first run: server, dev certificate, local speech and its engine
   (on by default, S1: Speaches on `localhost:8000`), the computer's name, the bridge's path and extra arguments.
-  "Ustawienia…" in the menu opens the file; "Uruchom ponownie" starts the bridge again with your edits.
+  "Ustawienia…" in the menu shows the file in Finder; "Uruchom ponownie" starts the bridge again with your edits.
 - **Account (S-2e):** the bridge signs in in the browser (OAuth with PKCE) and shows up in "Połączone aplikacje" as
   "JARVIS na komputerze", and in Konto → Komputery as this computer (`--link`). "Zaloguj ponownie" forgets the login
   (and a satellite pairing) on this computer and signs in again.
