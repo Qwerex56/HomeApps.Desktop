@@ -2,7 +2,7 @@ extends Node
 ## Runs the .NET bridge with --ipc and turns its JSON lines into signals (HomeApps.Desktop docs/bridge.md).
 ## stdout carries the events, stderr the bridge's own log (printed here with a [most] prefix). A bridge that
 ## dies on its own is started again a few times; quitting the app closes it. The owner calls start() once its
-## signals are connected.
+## signals are connected. Every start reads ~/.homeapps/hologram/settings.cfg again, so restart() applies edits.
 
 signal state_changed(state: String)
 signal level_changed(level: float)
@@ -36,6 +36,7 @@ func _exit_tree() -> void:
 
 func start() -> void:
 	var bridge_settings := settings as Settings
+	bridge_settings.load_user_file()
 	var path := bridge_settings.resolved_bridge_path()
 	if not FileAccess.file_exists(path):
 		error_reported.emit("app.bridge_missing", "Nie ma mostu w %s; zbuduj go: dotnet build" % path)
@@ -49,9 +50,32 @@ func start() -> void:
 	_stderr = pipe["stderr"]
 	_is_quitting = false
 	_events_thread = Thread.new()
-	_events_thread.start(_read_events)
+	_events_thread.start(_read_events.bind(_pid))
 	_log_thread = Thread.new()
 	_log_thread.start(_read_log)
+
+
+## Stops the bridge and starts it again with the settings as they are now.
+func restart() -> void:
+	quit()
+	_restarts = 0
+	state_changed.emit("connecting")
+	start()
+
+
+## Forgets the login (and a satellite's pairing) on this computer, then starts the bridge, which signs in again.
+func log_out() -> void:
+	quit()
+	var bridge_settings := settings as Settings
+	var path := bridge_settings.resolved_bridge_path()
+	var output: Array = []
+	if OS.execute(path, bridge_settings.logout_arguments(), output, true) != 0:
+		error_reported.emit("app.logout_failed", "Most nie wylogował się: %s" % "".join(output).strip_edges())
+	for line: String in "".join(output).strip_edges().split("\n", false):
+		print("[most] ", line)
+	_restarts = 0
+	state_changed.emit("connecting")
+	start()
 
 
 ## Sends one command: talk, stop, mute, unmute or quit.
@@ -76,15 +100,15 @@ func quit() -> void:
 	_pid = -1
 
 
-func _read_events() -> void:
+func _read_events(pid: int) -> void:
 	while true:
 		var line := _stdio.get_line()
 		if line.is_empty():
-			if _stdio.get_error() != OK or not OS.is_process_running(_pid):
+			if _stdio.get_error() != OK or not OS.is_process_running(pid):
 				break
 			continue
 		_handle_event.call_deferred(line)
-	_on_bridge_exited.call_deferred()
+	_on_bridge_exited.call_deferred(pid)
 
 
 func _read_log() -> void:
@@ -123,7 +147,9 @@ func _handle_event(line: String) -> void:
 			login_requested.emit(String(event.get("url", "")))
 
 
-func _on_bridge_exited() -> void:
+func _on_bridge_exited(pid: int) -> void:
+	if pid != _pid:
+		return  # a bridge that quit() or restart() already closed
 	_join_threads()
 	_pid = -1
 	if _is_quitting:

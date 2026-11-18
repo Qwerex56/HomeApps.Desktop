@@ -14,8 +14,14 @@ talking itself; it starts the bridge with `--ipc` ([bridge.md](bridge.md)) and s
   cleared when a new turn starts. Turn them off with `shows_captions` on the Hologram node.
 - **Menu-bar icon:** a left click is "Mów" (like Enter); the menu has Mów, Wycisz mikrofon and Wyjdź. The tooltip
   says what JARVIS is doing, or what is wrong.
-- **The bridge:** started from `data/settings/bridge_settings.tres` (server, dev certificate, local speech, path,
-  extra arguments). Its log appears in Godot's output as `[most] …`. When it dies it is started again, at most 5
+- **Settings (S-2e):** `~/.homeapps/hologram/settings.cfg`, written with the defaults from
+  `data/settings/bridge_settings.tres` on the first run: server, dev certificate, local speech and its engine
+  (on by default, S1: Speaches on `localhost:8000`), the computer's name, the bridge's path and extra arguments.
+  "Ustawienia…" in the menu opens the file; "Uruchom ponownie" starts the bridge again with your edits.
+- **Account (S-2e):** the bridge signs in in the browser (OAuth with PKCE) and shows up in "Połączone aplikacje" as
+  "JARVIS na komputerze", and in Konto → Komputery as this computer (`--link`). "Zaloguj ponownie" forgets the login
+  (and a satellite pairing) on this computer and signs in again.
+- **The bridge:** started with those settings. Its log appears in Godot's output as `[most] …`. When it dies it is started again, at most 5
   times; quitting the app closes it.
 
 ## Run it in dev
@@ -31,7 +37,7 @@ class cache; without that a plain `godot --path app` run cannot find them.
 
 The first time, the bridge opens the browser to sign in (or uses `--pair` from the terminal beforehand: the app
 starts whatever the bridge is paired as). The defaults point at `https://app.localhost`; for production change
-`server` and turn `allows_dev_certificate` off in `bridge_settings.tres`.
+`server` and turn `allows_dev_certificate` off in `~/.homeapps/hologram/settings.cfg`.
 
 Known limits: on macOS the app still has a Dock icon while run from the editor (`LSUIElement` comes with the export,
 S-2f); on Linux with Wayland "always on top" and transparency may not work (S8).

@@ -6,6 +6,8 @@
 script = ExtResource("1_settings")
 server = "https://app.localhost"
 allows_dev_certificate = true
-has_local_speech = false
+has_local_speech = true
+speech_engine = "http://localhost:8000"
+device_name = ""
 bridge_path = "../src/Jarvis.VoiceBridge/bin/Debug/net10.0/jarvis-voice-bridge"
 extra_arguments = PackedStringArray()
