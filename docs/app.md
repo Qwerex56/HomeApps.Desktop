@@ -1,12 +1,14 @@
-# The JARVIS app (S-2c)
+# The JARVIS app (S-2c, S-2d)
 
 `app/` is a Godot 4.7 project (GDScript, GL Compatibility): JARVIS's face on the computer. It does no listening or
 talking itself; it starts the bridge with `--ipc` ([bridge.md](bridge.md)) and shows what the bridge reports.
 
 - **Window:** 280×280, borderless, transparent, always on top, never takes focus and lets every click through (S5),
   in the bottom-right corner of the screen. It is empty until JARVIS listens, thinks or speaks.
-- **Hologram (placeholder):** a ring that pulses with JARVIS's voice (`level`) and turns while he thinks. The real
-  shader comes in S-2d.
+- **Hologram (S-2d):** an orb shader (`scenes/hologram/hologram.gdshader`) with a bright rim, moving scan lines and
+  a short glitch now and then. It pulses with JARVIS's voice (`level`), sends arcs round the rim while he thinks,
+  fades in at `listening` and out 1.2 s after he goes back to `idle`. Colour, size and effects are shader
+  uniforms, editable on the `Orb` node's material.
 - **Menu-bar icon:** a left click is "Mów" (like Enter); the menu has Mów, Wycisz mikrofon and Wyjdź. The tooltip
   says what JARVIS is doing, or what is wrong.
 - **The bridge:** started from `data/settings/bridge_settings.tres` (server, dev certificate, local speech, path,
