@@ -15,6 +15,7 @@ namespace Jarvis.VoiceBridge;
 /// <param name="Pair">S-1e: a pairing code from the household's Urządzenia page; the bridge becomes that household's satellite.</param>
 /// <param name="Unpair">Forget the satellite's pairing on this computer; the bridge is the person's again.</param>
 /// <param name="Ipc">S-2b: run as the hologram app's engine: JSON lines on stdout and stdin instead of a terminal.</param>
+/// <param name="Link">S-2e: keep this computer on the Devices link even without actions, so it shows in Konto → Komputery.</param>
 internal sealed record BridgeOptions(
     Uri Server,
     string Device,
@@ -27,13 +28,17 @@ internal sealed record BridgeOptions(
     string? Actions = null,
     string? Pair = null,
     bool Unpair = false,
-    bool Ipc = false)
+    bool Ipc = false,
+    bool Link = false)
 {
     public const string SttModel = "deepdml/faster-whisper-large-v3-turbo-ct2";
     public const string TtsModel = "speaches-ai/piper-pl_PL-gosia-medium";
     public const string TtsVoice = "gosia";
 
     public bool LocalSpeech => Engine is not null;
+
+    /// <summary>The name it registers under in "Połączone aplikacje": the hologram app is "JARVIS na komputerze".</summary>
+    public string ClientName => Ipc ? $"JARVIS na komputerze ({Device})" : $"JARVIS: most głosowy ({Device})";
 
     /// <summary>Models, the app's registration and (outside macOS) the token.</summary>
     public static string Home { get; } =
@@ -66,6 +71,7 @@ internal sealed record BridgeOptions(
             Value("--actions"),
             Value("--pair"),
             args.Contains("--unpair"),
-            args.Contains("--ipc"));
+            args.Contains("--ipc"),
+            args.Contains("--link"));
     }
 }

@@ -3,7 +3,7 @@ using Jarvis.VoiceBridge;
 // JARVIS's ears and mouth on the Mac (jarvis-voice-bridge.md, docs/jarvis.md "Voice bridge").
 //   dotnet run --project src/Jarvis.VoiceBridge -- [--server https://home-apps.dev] [--device mac-biuro]
 //     [--threshold 0.5] [--insecure] [--save-recordings ~/jarvis-nagrania] [--check-wake plik.wav] [--logout]
-//     [--speech local [--engine http://localhost:8000]] [--actions akcje.json] [--pair ABCD-EFGH] [--unpair] [--ipc]
+//     [--speech local [--engine http://localhost:8000]] [--actions akcje.json] [--pair ABCD-EFGH] [--unpair] [--ipc] [--link]
 var options = BridgeOptions.Parse(args);
 
 // --ipc (S-2b): stdout carries only the JSON events for the hologram app; everything else people read goes to stderr.
@@ -79,7 +79,7 @@ if (options.CheckWake is { } file)
 using var microphone = new Microphone();
 await using var link = new VoiceLink(options, options.Engine is { } engine ? new LocalSpeech(http, engine) : null);
 using var bridge = new Bridge(options, wake, login, link, microphone, output);
-await using var device = options.Actions is not null || login is SatelliteLogin
+await using var device = options.Actions is not null || options.Link || login is SatelliteLogin
     ? new DeviceLink(options, login, options.Actions is { } actions ? ComputerActions.Load(actions) : [])
     : null;
 var linked = device?.RunAsync(stop.Token) ?? Task.CompletedTask;

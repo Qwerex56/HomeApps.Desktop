@@ -24,14 +24,16 @@ dotnet run --project src/Jarvis.VoiceBridge -- --server https://home-apps.dev --
   another address) transcribes and speaks, and only text goes to the server. Use it when the server has no engine of
   its own, e.g. a home server too slow for Whisper.
 - **Computer actions:** `--actions <file>` also connects this Mac as a device, so JARVIS can run the actions from the
-  file (see "Computer actions" below).
+  file (see "Computer actions" below). `--link` connects it even without actions, so the computer shows in Konto →
+  Komputery (the hologram app always passes it).
 - **Satellite of a household (S-1e):** `--pair ABCD-EFGH` spends a code made by the household's admin on the
   Urządzenia page; the bridge keeps the device id and secret in the Keychain (a file under `~/.homeapps/voice-bridge/tokens`
   elsewhere) and from then on speaks for the household instead of a person: no browser login, 15-minute device
   tokens, always connected to `/devices/link` as a satellite. `--unpair` makes it a person's bridge again; `--logout`
   forgets both. If the household removes the satellite or makes a new code, the bridge forgets its pairing and asks
   for a new `--pair`.
-- **Engine for the hologram app:** `--ipc`, see below.
+- **Engine for the hologram app:** `--ipc`, see below. With `--ipc` the bridge registers in "Połączone aplikacje" as
+  "JARVIS na komputerze" instead (a bridge registered before keeps its old name until `--logout`).
 - **Licence:** the "hey jarvis" model is CC BY-NC-SA 4.0 (non-commercial), fine for a home.
 
 ## As the hologram app's engine: `--ipc` (S-2b)

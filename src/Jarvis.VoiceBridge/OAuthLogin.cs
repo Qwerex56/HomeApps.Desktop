@@ -110,7 +110,7 @@ internal sealed class OAuthLogin(HttpClient http, BridgeOptions options, TokenSt
     {
         using var response = await http.PostAsJsonAsync(server.Register, new JsonObject
         {
-            ["client_name"] = $"JARVIS: most głosowy ({options.Device})",
+            ["client_name"] = options.ClientName,
             ["redirect_uris"] = new JsonArray($"http://127.0.0.1{Callback}"),
             ["grant_types"] = new JsonArray("authorization_code", "refresh_token"),
             ["response_types"] = new JsonArray("code"),
