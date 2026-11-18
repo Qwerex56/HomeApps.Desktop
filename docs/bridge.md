@@ -31,7 +31,35 @@ dotnet run --project src/Jarvis.VoiceBridge -- --server https://home-apps.dev --
   tokens, always connected to `/devices/link` as a satellite. `--unpair` makes it a person's bridge again; `--logout`
   forgets both. If the household removes the satellite or makes a new code, the bridge forgets its pairing and asks
   for a new `--pair`.
+- **Engine for the hologram app:** `--ipc`, see below.
 - **Licence:** the "hey jarvis" model is CC BY-NC-SA 4.0 (non-commercial), fine for a home.
+
+## As the hologram app's engine: `--ipc` (S-2b)
+
+With `--ipc` nobody types into the bridge: the hologram app (S-2c) starts it as a child process and talks to it in
+JSON lines. **stdout** carries only events, one JSON object per line; everything people read (connecting, downloads,
+`(przerwane)`) goes to **stderr**, so the app can log it. **stdin** takes commands; when stdin closes, the bridge quits.
+
+```bash
+dotnet run --project src/Jarvis.VoiceBridge -- --server https://app.localhost --insecure --ipc
+{"type":"talk"}            # typed by hand to try it: like Enter
+```
+
+Events (stdout):
+
+| `type` | Fields | When |
+| --- | --- | --- |
+| `state` | `state`: `connecting`, `idle`, `listening`, `thinking`, `speaking`, `muted` | only when it changes |
+| `level` | `level`: 0 to 1 | ~30 times a second while JARVIS speaks (loudness relative to that sentence), then 0 |
+| `heard` | `text` | what the server (or local speech) understood |
+| `reply` | `text`, `actions`: `[{status, description}]` | JARVIS's answer as text |
+| `confirm` | | JARVIS waits for "tak" / "nie"; `listening` follows without the wake word |
+| `error` | `code`, `detail` | the server refused the turn, or an unknown command (`ipc.unknown_command`) |
+| `login` | `url` | the person has to sign in; the browser is opened as well |
+
+Commands (stdin): `{"type":"talk"}` (like Enter: start without the wake word, or end the utterance now),
+`{"type":"stop"}` (drop the utterance, or stop JARVIS mid-answer), `{"type":"mute"}` / `{"type":"unmute"}` (ignore the
+microphone, the wake word too), `{"type":"quit"}`.
 
 ## Computer actions
 
