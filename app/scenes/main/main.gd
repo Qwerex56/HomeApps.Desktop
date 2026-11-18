@@ -17,6 +17,8 @@ func _ready() -> void:
 	_place_window()
 	_bridge.state_changed.connect(_on_state_changed)
 	_bridge.level_changed.connect(_hologram.show_level)
+	_bridge.heard.connect(_hologram.show_heard)
+	_bridge.replied.connect(_hologram.show_reply)
 	_bridge.error_reported.connect(_on_error_reported)
 	_bridge.login_requested.connect(_on_login_requested)
 	_tray.talk_requested.connect(_bridge.send.bind("talk"))

@@ -3,13 +3,15 @@
 `app/` is a Godot 4.7 project (GDScript, GL Compatibility): JARVIS's face on the computer. It does no listening or
 talking itself; it starts the bridge with `--ipc` ([bridge.md](bridge.md)) and shows what the bridge reports.
 
-- **Window:** 280×280, borderless, transparent, always on top, never takes focus and lets every click through (S5),
+- **Window:** 320×420, borderless, transparent, always on top, never takes focus and lets every click through (S5),
   in the bottom-right corner of the screen. It is empty until JARVIS listens, thinks or speaks.
 - **Hologram (S-2d):** an orb shader (`scenes/hologram/hologram.gdshader`) with a bright rim, moving scan lines and
   a short glitch now and then. It pulses with JARVIS's voice (`level`), sends arcs round the rim while he thinks,
   fades in at `listening` and out 1.2 s after he goes back to `idle`. Colour, size and effects are shader
   uniforms, editable on the `Orb` node's material. To tune it without the bridge, run
   `scenes/hologram/hologram_preview.tscn` (F6): it plays a whole turn in a loop with a fake voice level.
+- **Subtitles:** under the orb, what JARVIS heard (`heard`, dimmer) and then his answer (`reply`), at most 4 lines;
+  cleared when a new turn starts. Turn them off with `shows_captions` on the Hologram node.
 - **Menu-bar icon:** a left click is "Mów" (like Enter); the menu has Mów, Wycisz mikrofon and Wyjdź. The tooltip
   says what JARVIS is doing, or what is wrong.
 - **The bridge:** started from `data/settings/bridge_settings.tres` (server, dev certificate, local speech, path,

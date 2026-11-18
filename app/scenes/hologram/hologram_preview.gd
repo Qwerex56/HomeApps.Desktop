@@ -19,6 +19,10 @@ func _process(delta: float) -> void:
 		_step = (_step + 1) % TURN.size()
 		_left = TURN[_step][1]
 		_hologram.show_state(TURN[_step][0])
+		if TURN[_step][0] == "thinking":
+			_hologram.show_heard("Jarvis, jaka jest pogoda na jutro?")
+		elif TURN[_step][0] == "speaking":
+			_hologram.show_reply("Jutro w Warszawie pochmurno, około pięciu stopni, po południu może popadać.")
 	if TURN[_step][0] == "speaking":
 		_speaking_time += delta
 		_hologram.show_level(absf(sin(_speaking_time * 7.0)) * (0.5 + 0.5 * sin(_speaking_time * 1.3)))
