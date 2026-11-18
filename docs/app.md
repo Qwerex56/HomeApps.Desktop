@@ -8,7 +8,8 @@ talking itself; it starts the bridge with `--ipc` ([bridge.md](bridge.md)) and s
 - **Hologram (S-2d):** an orb shader (`scenes/hologram/hologram.gdshader`) with a bright rim, moving scan lines and
   a short glitch now and then. It pulses with JARVIS's voice (`level`), sends arcs round the rim while he thinks,
   fades in at `listening` and out 1.2 s after he goes back to `idle`. Colour, size and effects are shader
-  uniforms, editable on the `Orb` node's material.
+  uniforms, editable on the `Orb` node's material. To tune it without the bridge, run
+  `scenes/hologram/hologram_preview.tscn` (F6): it plays a whole turn in a loop with a fake voice level.
 - **Menu-bar icon:** a left click is "Mów" (like Enter); the menu has Mów, Wycisz mikrofon and Wyjdź. The tooltip
   says what JARVIS is doing, or what is wrong.
 - **The bridge:** started from `data/settings/bridge_settings.tres` (server, dev certificate, local speech, path,
