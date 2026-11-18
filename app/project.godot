@@ -1,5 +1,10 @@
-; JARVIS on the computer (HomeApps jarvis-satellites.md, S-2): the hologram's window and the menu-bar icon.
-; The .NET bridge does the listening and talking; this app only starts it (--ipc) and shows what it reports.
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
 
@@ -10,8 +15,8 @@ config/description="JARVIS na komputerze: hologram i ikona w pasku menu nad most
 run/main_scene="res://scenes/main/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 run/low_processor_mode=true
-boot_splash/show_image=false
 boot_splash/bg_color=Color(0, 0, 0, 0)
+boot_splash/show_image=false
 config/icon="res://assets/icons/jarvis.svg"
 
 [display]
@@ -23,6 +28,10 @@ window/size/always_on_top=true
 window/size/transparent=true
 window/size/no_focus=true
 window/per_pixel_transparency/allowed=true
+
+[dotnet]
+
+project/assembly_name="JARVIS"
 
 [rendering]
 

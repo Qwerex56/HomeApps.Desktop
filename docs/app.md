@@ -20,6 +20,10 @@ dotnet build src/Jarvis.VoiceBridge          # the app starts the built bridge, 
 # then open app/project.godot in Godot 4.7 and press Play (F5)
 ```
 
+Rebuild the bridge after pulling bridge changes: an older build without `--ipc` still runs, but the app only logs
+its text and the hologram stays dark. Opening the project in the editor once imports the icon and the scripts'
+class cache; without that a plain `godot --path app` run cannot find them.
+
 The first time, the bridge opens the browser to sign in (or uses `--pair` from the terminal beforehand: the app
 starts whatever the bridge is paired as). The defaults point at `https://app.localhost`; for production change
 `server` and turn `allows_dev_certificate` off in `bridge_settings.tres`.

@@ -2,6 +2,7 @@ extends Node
 ## JARVIS on the computer (jarvis-satellites.md S-2c): starts the bridge, puts the window in the screen's
 ## corner (it never takes focus and lets clicks through, S5) and wires the bridge to the tray and the hologram.
 
+const BridgeProcess := preload("res://common/components/bridge_process/bridge_process.gd")
 const Tray := preload("res://scenes/tray/tray.gd")
 const Hologram := preload("res://scenes/hologram/hologram.gd")
 
@@ -21,6 +22,7 @@ func _ready() -> void:
 	_tray.talk_requested.connect(_bridge.send.bind("talk"))
 	_tray.mute_toggled.connect(_on_mute_toggled)
 	_tray.quit_requested.connect(_on_quit_requested)
+	_bridge.start()
 
 
 func _place_window() -> void:

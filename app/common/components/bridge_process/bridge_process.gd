@@ -1,8 +1,8 @@
-class_name BridgeProcess
 extends Node
 ## Runs the .NET bridge with --ipc and turns its JSON lines into signals (HomeApps.Desktop docs/bridge.md).
 ## stdout carries the events, stderr the bridge's own log (printed here with a [most] prefix). A bridge that
-## dies on its own is started again a few times; quitting the app closes it.
+## dies on its own is started again a few times; quitting the app closes it. The owner calls start() once its
+## signals are connected.
 
 signal state_changed(state: String)
 signal level_changed(level: float)
@@ -12,11 +12,14 @@ signal confirm_requested
 signal error_reported(code: String, detail: String)
 signal login_requested(url: String)
 
+const Settings := preload("res://resources/bridge_settings.gd")
+
 const RESTART_DELAY_SECONDS: float = 3.0
 const MAX_RESTARTS: int = 5
 const QUIT_WAIT_MSEC: int = 1500
 
-@export var settings: BridgeSettings
+## A BridgeSettings resource (data/settings/bridge_settings.tres).
+@export var settings: Resource
 
 var _pid: int = -1
 var _stdio: FileAccess
@@ -27,20 +30,17 @@ var _is_quitting: bool = false
 var _restarts: int = 0
 
 
-func _ready() -> void:
-	start()
-
-
 func _exit_tree() -> void:
 	quit()
 
 
 func start() -> void:
-	var path := settings.resolved_bridge_path()
+	var bridge_settings := settings as Settings
+	var path := bridge_settings.resolved_bridge_path()
 	if not FileAccess.file_exists(path):
 		error_reported.emit("app.bridge_missing", "Nie ma mostu w %s; zbuduj go: dotnet build" % path)
 		return
-	var pipe := OS.execute_with_pipe(path, settings.arguments())
+	var pipe := OS.execute_with_pipe(path, bridge_settings.arguments())
 	if pipe.is_empty():
 		error_reported.emit("app.bridge_failed", "Nie mogę uruchomić %s" % path)
 		return
@@ -98,6 +98,10 @@ func _read_log() -> void:
 
 
 func _handle_event(line: String) -> void:
+	if not line.begins_with("{"):
+		# An older bridge without --ipc, or text that slipped onto stdout: log it, it is not an event.
+		print("[most] ", line)
+		return
 	var event: Variant = JSON.parse_string(line)
 	if typeof(event) != TYPE_DICTIONARY:
 		push_warning("Most wypisał coś, co nie jest zdarzeniem: %s" % line)
