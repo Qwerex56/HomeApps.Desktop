@@ -1,0 +1,43 @@
+# The JARVIS bridge
+
+`src/Jarvis.VoiceBridge` is a console app for the Mac (it also runs on Linux): it only listens for "Hey Jarvis"
+locally and carries sound, everything else happens on the HomeApps server (`/jarvis/voice`, `/devices/link`; see
+HomeApps `docs/jarvis.md` and `docs/devices.md` for the server side).
+
+```bash
+dotnet run --project src/Jarvis.VoiceBridge -- --server https://home-apps.dev --device mac-biuro
+# dev: --server https://app.localhost --insecure
+```
+
+- **First run:** downloads the three openWakeWord models (v0.5.1, checked by hash) into `~/.homeapps/voice-bridge`,
+  macOS asks for microphone access for the terminal, and the browser opens HomeApps' consent screen ("Zezwól"). The
+  bridge then keeps its refresh token in the Keychain and appears under "Połączone aplikacje" as "JARVIS: most głosowy".
+  `--logout` forgets it on this Mac.
+- **Using it:** "Hey Jarvis" (a rising chime) → say the request → after ~0.7 s of quiet a falling chime, the transcript
+  and JARVIS's answer are printed and spoken (`afplay`). When he asks to confirm, a chime and 8 s for "tak" / "nie"
+  without the wake word. Enter starts without the wake word, ends the utterance early, or stops JARVIS mid-answer;
+  `q` quits. While he speaks the microphone is ignored (a Mac has no echo cancellation here), so press Enter to interrupt him.
+- **Tuning:** `--threshold` (0.5) is the wake word's score. `--save-recordings <folder>` keeps each turn as a WAV on
+  this Mac only (V7); `--check-wake <file.wav>` prints the best score in a 16 kHz recording, e.g. one of yours, to pick a
+  threshold. Synthetic English "hey jarvis" scores 0.96-0.99, unrelated speech 0.00; a Polish accent may score lower.
+- **Speech on this Mac (S1):** `--speech local` keeps the sound here: Speaches on `localhost:8000` (`--engine` for
+  another address) transcribes and speaks, and only text goes to the server. Use it when the server has no engine of
+  its own, e.g. a home server too slow for Whisper.
+- **Computer actions:** `--actions <file>` also connects this Mac as a device, so JARVIS can run the actions from the
+  file (see "Computer actions" below).
+- **Satellite of a household (S-1e):** `--pair ABCD-EFGH` spends a code made by the household's admin on the
+  Urządzenia page; the bridge keeps the device id and secret in the Keychain (a file under `~/.homeapps/voice-bridge/tokens`
+  elsewhere) and from then on speaks for the household instead of a person: no browser login, 15-minute device
+  tokens, always connected to `/devices/link` as a satellite. `--unpair` makes it a person's bridge again; `--logout`
+  forgets both. If the household removes the satellite or makes a new code, the bridge forgets its pairing and asks
+  for a new `--pair`.
+- **Licence:** the "hey jarvis" model is CC BY-NC-SA 4.0 (non-commercial), fine for a home.
+
+## Computer actions
+
+`--actions <file>` on the voice bridge connects the computer as a device. The file is a JSON array (comments allowed);
+each action has `name`, `description`, `run` (a command for `/bin/sh -c`), optionally `input` (a JSON schema),
+`readOnly` and `confirm`. The input reaches the command only as environment variables, `JARVIS_<FIELD>` for each field
+and `JARVIS_INPUT` for the whole JSON, so quote them (`"$JARVIS_TEXT"`); never paste them into the command text. A
+command has 15 s, and the first 2000 characters of its output (or of its errors when it fails) are JARVIS's answer.
+Example for a Mac: `src/Jarvis.VoiceBridge/actions.macos.example.json`.

@@ -1,0 +1,15 @@
+<Project>
+  <!-- Settings for every project here; tests/ adds the test packages on top. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <!-- CA2007: no ConfigureAwait in app code. -->
+    <NoWarn>$(NoWarn);CA2007</NoWarn>
+    <Version>0.1.0</Version>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>

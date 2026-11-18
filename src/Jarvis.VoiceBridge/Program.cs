@@ -1,7 +1,7 @@
 using Jarvis.VoiceBridge;
 
 // JARVIS's ears and mouth on the Mac (jarvis-voice-bridge.md, docs/jarvis.md "Voice bridge").
-//   dotnet run --project src/Jarvis/Jarvis.VoiceBridge -- [--server https://home-apps.dev] [--device mac-biuro]
+//   dotnet run --project src/Jarvis.VoiceBridge -- [--server https://home-apps.dev] [--device mac-biuro]
 //     [--threshold 0.5] [--insecure] [--save-recordings ~/jarvis-nagrania] [--check-wake plik.wav] [--logout]
 //     [--speech local [--engine http://localhost:8000]] [--actions akcje.json] [--pair ABCD-EFGH] [--unpair]
 var options = BridgeOptions.Parse(args);

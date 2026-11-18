@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Jarvis.VoiceBridge/Jarvis.VoiceBridge.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Jarvis.VoiceBridge.Tests/Jarvis.VoiceBridge.Tests.csproj" />
+  </Folder>
+</Solution>
