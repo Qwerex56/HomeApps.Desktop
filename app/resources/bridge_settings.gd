@@ -4,6 +4,13 @@ extends Resource
 ## The values here are defaults; each person's own live in ~/.homeapps/hologram/settings.cfg (S-2e), written with
 ## these defaults on the first run and read again every time the bridge starts.
 
+## Where the exported app keeps its own bridge (S-2f): next to the executable on Linux, in Resources on macOS.
+const BUNDLED_BRIDGE_MACOS: String = "../Resources/bridge/jarvis-voice-bridge"
+const BUNDLED_BRIDGE_LINUX: String = "bridge/jarvis-voice-bridge"
+## The bridge built by dotnet build, used when the app runs from the editor.
+const DEV_BRIDGE: String = "../src/Jarvis.VoiceBridge/bin/Debug/net10.0/jarvis-voice-bridge"
+## What an exported app starts with on its first run (the .tres defaults are for dev).
+const PRODUCTION_SERVER: String = "https://home-apps.dev"
 const USER_FOLDER: String = ".homeapps/hologram"
 const USER_FILE: String = "settings.cfg"
 const SECTION: String = "bridge"
@@ -22,8 +29,9 @@ const KEYS: PackedStringArray = [
 @export var speech_engine: String = "http://localhost:8000"
 ## How this computer is called in Konto → Komputery; empty: the computer's own name.
 @export var device_name: String = ""
-## The built bridge (dotnet build); a relative path starts at this Godot project.
-@export var bridge_path: String = "../src/Jarvis.VoiceBridge/bin/Debug/net10.0/jarvis-voice-bridge"
+## Another bridge than the usual one; empty: the bridge inside the exported app, or the dev build from the editor.
+## A relative path starts at this Godot project and counts only in the editor.
+@export var bridge_path: String = ""
 ## Anything else for the bridge, e.g. ["--actions", "/Users/me/akcje.json"].
 @export var extra_arguments: PackedStringArray = []
 
@@ -40,6 +48,9 @@ func load_user_file() -> void:
 	var path := user_file_path()
 	var file := ConfigFile.new()
 	if file.load(path) != OK:
+		if not OS.has_feature("editor"):
+			server = PRODUCTION_SERVER
+			allows_dev_certificate = false
 		_save_user_file(path)
 		return
 	for key in KEYS:
@@ -50,7 +61,11 @@ func load_user_file() -> void:
 func resolved_bridge_path() -> String:
 	if bridge_path.is_absolute_path():
 		return bridge_path
-	return ProjectSettings.globalize_path("res://").path_join(bridge_path).simplify_path()
+	if OS.has_feature("editor"):
+		var dev_path := DEV_BRIDGE if bridge_path.is_empty() else bridge_path
+		return ProjectSettings.globalize_path("res://").path_join(dev_path).simplify_path()
+	var bundled := BUNDLED_BRIDGE_MACOS if OS.get_name() == "macOS" else BUNDLED_BRIDGE_LINUX
+	return OS.get_executable_path().get_base_dir().path_join(bundled).simplify_path()
 
 
 func arguments() -> PackedStringArray:

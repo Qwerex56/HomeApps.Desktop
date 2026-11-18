@@ -9,5 +9,5 @@ allows_dev_certificate = true
 has_local_speech = true
 speech_engine = "http://localhost:8000"
 device_name = ""
-bridge_path = "../src/Jarvis.VoiceBridge/bin/Debug/net10.0/jarvis-voice-bridge"
+bridge_path = ""
 extra_arguments = PackedStringArray()
