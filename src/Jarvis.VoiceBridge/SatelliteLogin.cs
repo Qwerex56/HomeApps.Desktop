@@ -24,12 +24,11 @@ internal sealed class SatelliteLogin(HttpClient http, BridgeOptions options, Tok
     public async Task<PairedDevice> PairAsync(string code, CancellationToken cancellationToken)
     {
         using var response = await http.PostAsJsonAsync(new Uri(options.Server, "devices/pair"), new { code }, cancellationToken);
-        if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.BadRequest)
+        if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException("Ten kod nie działa: wygasł, został użyty albo jest błędny. Poproś admina domu o nowy.");
+            throw new InvalidOperationException(PairingRefused(await ServerProblem.ReadAsync(response, cancellationToken)));
         }
 
-        response.EnsureSuccessStatusCode();
         var paired = await response.Content.ReadFromJsonAsync<PairedDevice>(cancellationToken)
             ?? throw new InvalidOperationException("Devices answered the pairing without the device.");
         store.Write(DeviceKey, paired.DeviceId.ToString());
@@ -56,7 +55,12 @@ internal sealed class SatelliteLogin(HttpClient http, BridgeOptions options, Tok
             throw Unpaired();
         }
 
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var problem = await ServerProblem.ReadAsync(response, cancellationToken);
+            throw new InvalidOperationException($"Auth nie wydał tokenu satelity ({problem}).");
+        }
+
         var token = await response.Content.ReadFromJsonAsync<DeviceToken>(cancellationToken)
             ?? throw new InvalidOperationException("Auth answered without a token.");
         (_access, _expires) = (token.AccessToken, token.ExpiresAt);
@@ -69,6 +73,18 @@ internal sealed class SatelliteLogin(HttpClient http, BridgeOptions options, Tok
         store.Delete(SecretKey);
         _access = null;
     }
+
+    private static string PairingRefused(ServerProblem problem) => problem.Code switch
+    {
+        "devices.pairing_expired" =>
+            "Ten kod nie działa: wygasł, został użyty albo jest błędny. Poproś admina domu o nowy.",
+        "devices.pairing_unavailable" =>
+            "Serwer nie może teraz sparować satelity (Devices nie dogadał się z Auth). Kod nadal jest ważny: spróbuj za "
+            + $"chwilę, a jeśli to się powtarza, sprawdź Devices:ClientSecret / DEVICES_CLIENT_SECRET ({problem}).",
+        _ when problem.Status is 400 or 404 =>
+            $"Ten kod nie działa: wygasł, został użyty albo jest błędny. Poproś admina domu o nowy ({problem}).",
+        _ => $"Parowanie się nie udało ({problem}).",
+    };
 
     private static InvalidOperationException Unpaired() =>
         new("Ta satelita nie jest już sparowana z domem. Admin daje nowy kod na stronie Urządzenia: uruchom most z --pair <kod>.");

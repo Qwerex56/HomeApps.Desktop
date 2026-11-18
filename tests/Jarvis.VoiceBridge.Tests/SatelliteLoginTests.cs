@@ -60,6 +60,29 @@ public sealed class SatelliteLoginTests : IDisposable
     }
 
     [Fact]
+    public async Task A_server_that_cannot_pair_now_says_so_and_keeps_the_code_usable()
+    {
+        _server.Answers["/devices/pair"] = (HttpStatusCode.Conflict,
+            """{"title":"Conflict","status":409,"code":"devices.pairing_unavailable","detail":"Pairing is not available right now."}""");
+
+        var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => _login.PairAsync("abcd-efgh", CancellationToken.None));
+
+        Assert.Contains("Kod nadal jest ważny", refused.Message, StringComparison.Ordinal);
+        Assert.Contains("HTTP 409 devices.pairing_unavailable", refused.Message, StringComparison.Ordinal);
+        Assert.False(SatelliteLogin.IsPaired(_store));
+    }
+
+    [Fact]
+    public async Task Any_other_refusal_is_shown_with_its_status_even_without_a_problem_body()
+    {
+        _server.Answers["/devices/pair"] = (HttpStatusCode.BadGateway, "<html>Bad gateway</html>");
+
+        var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => _login.PairAsync("abcd-efgh", CancellationToken.None));
+
+        Assert.Equal("Parowanie się nie udało (HTTP 502).", refused.Message);
+    }
+
+    [Fact]
     public async Task A_satellite_removed_in_the_household_forgets_its_pairing()
     {
         await _login.PairAsync("abcd-efgh", CancellationToken.None);

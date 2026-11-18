@@ -46,6 +46,11 @@ if (options.Pair is { } code)
         Console.Error.WriteLine(exception.Message);
         return;
     }
+    catch (HttpRequestException exception)
+    {
+        Console.Error.WriteLine($"Nie mogę połączyć się z {options.Server}: {exception.Message}");
+        return;
+    }
 }
 
 // Paired once, the bridge is the household's satellite (S-1e): it speaks as the household and is always on its link.
