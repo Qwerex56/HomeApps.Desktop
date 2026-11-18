@@ -1,15 +1,16 @@
 extends StatusIndicator
 ## JARVIS's icon in the menu bar (S5): a left click is "Mów"; the right-click menu also mutes, opens the settings,
-## restarts the bridge, signs in again (S-2e) and quits. The tooltip says what JARVIS is doing.
+## restarts the bridge, signs in again (S-2e), starts JARVIS at login (S-2f) and quits. The tooltip says what JARVIS is doing.
 
 signal talk_requested
 signal mute_toggled(is_muted: bool)
 signal settings_requested
 signal restart_requested
 signal logout_requested
+signal autostart_toggled(enabled: bool)
 signal quit_requested
 
-enum Item { TALK = 0, MUTE = 1, SETTINGS = 3, RESTART = 4, LOGOUT = 5, QUIT = 7 }
+enum Item { TALK = 0, MUTE = 1, SETTINGS = 3, RESTART = 4, LOGOUT = 5, QUIT = 7, AUTOSTART = 8 }
 
 const STATE_NAMES: Dictionary = {
 	"connecting": "łączę z HomeApps…",
@@ -31,6 +32,13 @@ func _ready() -> void:
 
 func show_state(state: String) -> void:
 	tooltip = "JARVIS: %s" % STATE_NAMES.get(state, state)
+
+
+## The "Uruchamiaj przy logowaniu" item: ticked when on, greyed out where it cannot work (the editor).
+func show_autostart(is_enabled: bool, is_supported: bool) -> void:
+	var index := _menu.get_item_index(Item.AUTOSTART)
+	_menu.set_item_checked(index, is_enabled)
+	_menu.set_item_disabled(index, not is_supported)
 
 
 func show_problem(detail: String) -> void:
@@ -57,5 +65,10 @@ func _on_menu_id_pressed(id: int) -> void:
 			restart_requested.emit()
 		Item.LOGOUT:
 			logout_requested.emit()
+		Item.AUTOSTART:
+			var index := _menu.get_item_index(Item.AUTOSTART)
+			var is_enabled := not _menu.is_item_checked(index)
+			_menu.set_item_checked(index, is_enabled)
+			autostart_toggled.emit(is_enabled)
 		Item.QUIT:
 			quit_requested.emit()

@@ -6,12 +6,14 @@ const BridgeProcess := preload("res://common/components/bridge_process/bridge_pr
 const Tray := preload("res://scenes/tray/tray.gd")
 const Hologram := preload("res://scenes/hologram/hologram.gd")
 const Settings := preload("res://resources/bridge_settings.gd")
+const Autostart := preload("res://common/components/autostart/autostart.gd")
 
 const SCREEN_MARGIN: int = 24
 
 @onready var _bridge: BridgeProcess = $BridgeProcess
 @onready var _tray: Tray = $Tray
 @onready var _hologram: Hologram = $Hologram
+@onready var _autostart: Autostart = $Autostart
 
 
 func _ready() -> void:
@@ -28,6 +30,8 @@ func _ready() -> void:
 	_tray.restart_requested.connect(_bridge.restart)
 	_tray.logout_requested.connect(_bridge.log_out)
 	_tray.quit_requested.connect(_on_quit_requested)
+	_tray.autostart_toggled.connect(_autostart.set_enabled)
+	_tray.show_autostart(_autostart.is_enabled(), _autostart.is_supported())
 	_bridge.start()
 
 

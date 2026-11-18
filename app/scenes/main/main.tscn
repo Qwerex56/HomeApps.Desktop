@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scenes/main/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://common/components/bridge_process/bridge_process.tscn" id="2_bridge"]
 [ext_resource type="Resource" path="res://data/settings/bridge_settings.tres" id="3_settings"]
 [ext_resource type="PackedScene" path="res://scenes/tray/tray.tscn" id="4_tray"]
 [ext_resource type="PackedScene" path="res://scenes/hologram/hologram.tscn" id="5_hologram"]
+[ext_resource type="PackedScene" path="res://common/components/autostart/autostart.tscn" id="6_autostart"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1_main")
@@ -15,3 +16,5 @@ settings = ExtResource("3_settings")
 [node name="Tray" parent="." instance=ExtResource("4_tray")]
 
 [node name="Hologram" parent="." instance=ExtResource("5_hologram")]
+
+[node name="Autostart" parent="." instance=ExtResource("6_autostart")]
