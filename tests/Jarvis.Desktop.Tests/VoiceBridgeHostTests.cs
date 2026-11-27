@@ -5,7 +5,7 @@ namespace Jarvis.Desktop.Tests;
 public class VoiceBridgeHostTests
 {
     [Fact]
-    public async Task SetMutedAsync_BeforeTheBridgeRuns_DoesNothing()
+    public async Task SetMutedAsync_BeforeTheBridgeRuns_ReportsNoState()
     {
         var states = new List<string>();
         var host = new VoiceBridgeHost(states.Add);
