@@ -6,15 +6,25 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
+using Jarvis.VoiceBridge;
 
 namespace HomeApps.Desktop;
 
-public sealed class App : Application
+public sealed class App : Application, IDisposable
 {
     private TrayIconManager? _icons;
     private MuteSwitch? _mute;
+    private GlobalHotkey? _hotkey;
+    private VoiceBridgeHost? _host;
+    private readonly CancellationTokenSource _stop = new();
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
+
+    public void Dispose()
+    {
+        _hotkey?.Dispose();
+        _stop.Dispose();
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {
@@ -27,6 +37,23 @@ public sealed class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 
+    private async Task RunBridgeAsync(string[] args)
+    {
+        try
+        {
+            await _host!.RunAsync(args, _stop.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Quitting.
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or IOException)
+        {
+            Console.Error.WriteLine($"Most głosowy się zatrzymał: {exception.Message}");
+            Dispatcher.UIThread.Post(() => _icons?.SetState(TrayState.Muted));
+        }
+    }
+
     private void StartTray(IClassicDesktopStyleApplicationLifetime desktop)
     {
         var tray = new TrayIcon { ToolTipText = "JARVIS" };
@@ -34,20 +61,33 @@ public sealed class App : Application
         var muteItem = new NativeMenuItem("Wycisz mikrofon");
         _mute = new MuteSwitch(muted =>
         {
+            _ = _host?.SetMutedAsync(muted);
             muteItem.Header = muted ? "Włącz mikrofon" : "Wycisz mikrofon";
             _icons.SetState(muted ? TrayState.Muted : TrayState.Idle);
         });
         muteItem.Click += (_, _) => _mute.Toggle();
         var quit = new NativeMenuItem("Zakończ");
         quit.Click += (_, _) => desktop.Shutdown();
+        desktop.ShutdownRequested += (_, _) =>
+        {
+            _stop.Cancel();
+            _hotkey?.Dispose();
+        };
         tray.Menu = [muteItem, new NativeMenuItemSeparator(), quit];
 
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         timer.Tick += (_, _) => _icons.Tick();
         timer.Start();
 
-        _icons.SetState(TrayState.Idle);
+        _icons.SetState(TrayState.Connecting);
         tray.IsVisible = true;
+
+        _hotkey = new GlobalHotkey(() => Dispatcher.UIThread.Post(_mute.Toggle));
+        _hotkey.Start();
+
+        var icons = _icons;
+        _host = new VoiceBridgeHost(state => Dispatcher.UIThread.Post(() => icons.SetState(state)));
+        _ = RunBridgeAsync(desktop.Args ?? []);
     }
 }
 
