@@ -8,6 +8,9 @@
     <!-- Microphone through PortAudio (MIT) and the openWakeWord models ("Hey Jarvis") through ONNX Runtime (MIT). -->
     <PackageVersion Include="PortAudioSharp2" Version="1.0.6" />
     <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.30.0" />
+    <!-- In-process speech to text (MIT): GGML Whisper models and its native runtime. Piper TTS runs on ONNX Runtime above. -->
+    <PackageVersion Include="Whisper.net" Version="1.9.1" />
+    <PackageVersion Include="Whisper.net.Runtime" Version="1.9.1" />
   </ItemGroup>
 
   <ItemGroup Label="Desktop">
