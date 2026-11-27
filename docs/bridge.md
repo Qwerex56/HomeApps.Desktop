@@ -22,9 +22,15 @@ dotnet run --project src/Jarvis.VoiceBridge -- --server https://home-apps.dev --
 - **Tuning:** `--threshold` (0.5) is the wake word's score. `--save-recordings <folder>` keeps each turn as a WAV on
   this Mac only (V7); `--check-wake <file.wav>` prints the best score in a 16 kHz recording, e.g. one of yours, to pick a
   threshold. Synthetic English "hey jarvis" scores 0.96-0.99, unrelated speech 0.00; a Polish accent may score lower.
-- **Speech on this Mac (S1):** `--speech local` keeps the sound here: Speaches on `localhost:8000` (`--engine` for
-  another address) transcribes and speaks, and only text goes to the server. Use it when the server has no engine of
-  its own, e.g. a home server too slow for Whisper.
+- **Speech on this Mac (S1, D10):** `--speech local` keeps the sound here and only text goes to the server. Without
+  `--engine` nothing else runs: Whisper (Whisper.net, GGML) hears and Piper (ONNX Runtime) speaks inside the bridge, so
+  `?speech=local` plays locally with no Speaches container. `--engine http://host:8000` still selects an external
+  OpenAI-audio engine (Speaches). See "Speech without Speaches" below.
+- **Follow-up window (D11):** after EVERY answer the microphone stays open for 8 s without the wake word; 8 s of
+  silence closes it. While JARVIS speaks only "stop" or "cisza" gets through (echo-gated against the playback); it
+  needs `--speech local`, because the bridge must hear the word itself.
+- **One computer at a time (Q2 A):** when the server answers `{"type":"lease_conflict","code":"turn_in_progress"}`,
+  another computer of the same person holds the turn: this bridge goes idle at once, sends nothing, plays nothing.
 - **Computer actions:** `--actions <file>` also connects this Mac as a device, so JARVIS can run the actions from the
   file (see "Computer actions" below). `--link` connects it even without actions, so the computer shows in Konto →
   Komputery (the hologram app always passes it).
@@ -73,3 +79,17 @@ each action has `name`, `description`, `run` (a command for `/bin/sh -c`), optio
 and `JARVIS_INPUT` for the whole JSON, so quote them (`"$JARVIS_TEXT"`); never paste them into the command text. A
 command has 15 s, and the first 2000 characters of its output (or of its errors when it fails) are JARVIS's answer.
 Example for a Mac: `src/Jarvis.VoiceBridge/actions.macos.example.json`.
+
+## Speech without Speaches (`--speech local`)
+
+The models are large and are NOT in git. Put them in `~/.homeapps/voice-bridge/models/` (or point `--stt-model` and
+`--tts-model` at them); the bridge says which file is missing.
+
+| File | Where from |
+|---|---|
+| `ggml-base.bin` (or `ggml-tiny.bin`, then `--stt-model`) | `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin` |
+| `pl_PL-gosia-medium.onnx` and `pl_PL-gosia-medium.onnx.json` | `https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/gosia/medium/` |
+
+Piper needs phonemes: install `espeak-ng` (macOS `brew install espeak-ng`, Linux `apt install espeak-ng`).
+Echo cancellation is a level gate against the WAV being played (a microphone frame counts only when clearly louder than
+the playback at that moment), not an adaptive filter: tune `EchoGate.Margin` if JARVIS interrupts himself.
