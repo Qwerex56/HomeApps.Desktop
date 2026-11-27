@@ -13,7 +13,15 @@ internal sealed class WhisperTranscriber : ITranscriber, IDisposable
     public WhisperTranscriber(string modelPath)
     {
         _factory = WhisperFactory.FromPath(modelPath);
-        _processor = _factory.CreateBuilder().WithLanguage("pl").Build();
+        try
+        {
+            _processor = _factory.CreateBuilder().WithLanguage("pl").Build();
+        }
+        catch
+        {
+            _factory.Dispose();
+            throw;
+        }
     }
 
     public async Task<string> TranscribeAsync(short[] pcm, CancellationToken cancellationToken)

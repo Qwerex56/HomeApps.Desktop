@@ -105,10 +105,29 @@ internal sealed class PiperSynthesizer : ISynthesizer, IDisposable
         try
         {
             using var espeak = Process.Start(start) ?? throw new InvalidOperationException("Cannot start espeak-ng.");
+            using var kill = cancellationToken.Register(() =>
+            {
+                try
+                {
+                    espeak.Kill(entireProcessTree: true);
+                }
+                catch (InvalidOperationException)
+                {
+                    // Already gone.
+                }
+            });
+            var output = espeak.StandardOutput.ReadToEndAsync(cancellationToken);
+            var errors = espeak.StandardError.ReadToEndAsync(cancellationToken);
             await espeak.StandardInput.WriteAsync(text.AsMemory(), cancellationToken);
             espeak.StandardInput.Close();
-            var phonemes = await espeak.StandardOutput.ReadToEndAsync(cancellationToken);
+            var phonemes = await output;
+            var error = await errors;
             await espeak.WaitForExitAsync(cancellationToken);
+            if (espeak.ExitCode != 0)
+            {
+                throw new InvalidOperationException($"espeak-ng failed ({espeak.ExitCode}): {error.Trim()}");
+            }
+
             return string.Join(' ', phonemes.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
         }
         catch (System.ComponentModel.Win32Exception exception)

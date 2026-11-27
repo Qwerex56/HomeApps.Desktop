@@ -9,58 +9,80 @@ internal sealed class StopWordListener(Func<short[], CancellationToken, Task<str
     private const int PauseFrames = 5;
     private const int LongestFrames = 31;
 
+    private readonly Lock _lock = new();
     private readonly List<short> _heard = [];
     private EchoGate? _gate;
     private TimeSpan _started;
     private int _speechFrames;
     private int _quietFrames;
 
-    public bool Active => _gate is not null;
+    public bool Active
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _gate is not null;
+            }
+        }
+    }
 
     /// <summary>A sentence starts playing: <paramref name="wav"/> is the echo to ignore.</summary>
     public void Begin(byte[] wav)
     {
-        _gate = EchoGate.FromWav(wav);
-        _started = clock();
-        Reset();
+        var gate = EchoGate.FromWav(wav);
+        lock (_lock)
+        {
+            _gate = gate;
+            _started = clock();
+            Reset();
+        }
     }
 
     public void End()
     {
-        _gate = null;
-        Reset();
+        lock (_lock)
+        {
+            _gate = null;
+            Reset();
+        }
     }
 
     /// <returns><c>true</c> when the person said a stop word.</returns>
     public async Task<bool> PushAsync(short[] frame, CancellationToken cancellationToken)
     {
-        if (_gate is null)
+        short[] pcm;
+        lock (_lock)
         {
-            return false;
+            if (_gate is null)
+            {
+                return false;
+            }
+
+            if (_gate.IsUserSpeech(frame, clock() - _started))
+            {
+                _speechFrames++;
+                _quietFrames = 0;
+            }
+            else if (_speechFrames == 0)
+            {
+                return false;
+            }
+            else
+            {
+                _quietFrames++;
+            }
+
+            _heard.AddRange(frame);
+            if (_quietFrames < PauseFrames && _heard.Count < LongestFrames * WakeWord.FrameSamples)
+            {
+                return false;
+            }
+
+            pcm = _heard.ToArray();
+            Reset();
         }
 
-        if (_gate.IsUserSpeech(frame, clock() - _started))
-        {
-            _speechFrames++;
-            _quietFrames = 0;
-        }
-        else if (_speechFrames == 0)
-        {
-            return false;
-        }
-        else
-        {
-            _quietFrames++;
-        }
-
-        _heard.AddRange(frame);
-        if (_quietFrames < PauseFrames && _heard.Count < LongestFrames * WakeWord.FrameSamples)
-        {
-            return false;
-        }
-
-        var pcm = _heard.ToArray();
-        Reset();
         return StopWords.IsStop(await transcribe(pcm, cancellationToken));
     }
 
