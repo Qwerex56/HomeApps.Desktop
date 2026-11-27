@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The tray app's logic without a screen: icon states and animation, mute. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\HomeApps.Desktop\HomeApps.Desktop.csproj" />
+  </ItemGroup>
+
+</Project>
