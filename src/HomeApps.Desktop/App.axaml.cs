@@ -47,10 +47,10 @@ public sealed class App : Application, IDisposable
         {
             // Quitting.
         }
-        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or IOException)
+        catch (Exception exception)
         {
             Console.Error.WriteLine($"Most głosowy się zatrzymał: {exception.Message}");
-            Dispatcher.UIThread.Post(() => _icons?.SetState(TrayState.Muted));
+            Dispatcher.UIThread.Post(() => _icons?.SetState(TrayState.Connecting));
         }
     }
 
@@ -63,7 +63,12 @@ public sealed class App : Application, IDisposable
         {
             _ = _host?.SetMutedAsync(muted);
             muteItem.Header = muted ? "Włącz mikrofon" : "Wycisz mikrofon";
-            _icons.SetState(muted ? TrayState.Muted : TrayState.Idle);
+            if (muted)
+            {
+                _icons.SetState(TrayState.Muted);
+            }
+
+            // Unmuting: the bridge reports the state it is really in.
         });
         muteItem.Click += (_, _) => _mute.Toggle();
         var quit = new NativeMenuItem("Zakończ");
@@ -72,6 +77,7 @@ public sealed class App : Application, IDisposable
         {
             _stop.Cancel();
             _hotkey?.Dispose();
+            _hotkey = null;
         };
         tray.Menu = [muteItem, new NativeMenuItemSeparator(), quit];
 
@@ -88,42 +94,5 @@ public sealed class App : Application, IDisposable
         var icons = _icons;
         _host = new VoiceBridgeHost(state => Dispatcher.UIThread.Post(() => icons.SetState(state)));
         _ = RunBridgeAsync(desktop.Args ?? []);
-    }
-}
-
-/// <summary>Draws the tray icons: a colored disc per state, its ring pulsing with the animation frame.</summary>
-internal static class TrayIcons
-{
-    private static readonly Dictionary<string, WindowIcon> Cache = [];
-
-    public static WindowIcon For(string key)
-    {
-        if (Cache.TryGetValue(key, out var cached))
-        {
-            return cached;
-        }
-
-        var state = key.Split('-')[0];
-        var frame = key.Contains('-') ? int.Parse(key.Split('-')[1], System.Globalization.CultureInfo.InvariantCulture) : 0;
-        var color = state switch
-        {
-            "listening" => Colors.LimeGreen,
-            "thinking" => Colors.Orange,
-            "speaking" => Colors.DeepSkyBlue,
-            "muted" => Colors.IndianRed,
-            "connecting" => Colors.Gray,
-            _ => Colors.SteelBlue,
-        };
-        const int size = 32;
-        var bitmap = new RenderTargetBitmap(new PixelSize(size, size));
-        using (var context = bitmap.CreateDrawingContext())
-        {
-            var radius = 9 + frame;
-            context.DrawEllipse(new SolidColorBrush(color), null, new Point(size / 2.0, size / 2.0), radius, radius);
-        }
-
-        var icon = new WindowIcon(bitmap);
-        Cache[key] = icon;
-        return icon;
     }
 }

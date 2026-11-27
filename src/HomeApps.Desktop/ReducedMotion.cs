@@ -27,6 +27,8 @@ public static class ReducedMotion
                 return Run("gsettings", "get org.gnome.desktop.interface enable-animations") == "false";
             }
 
+            // Windows: MinAnimate is the "Animate windows when minimizing and maximizing" effect, the closest setting
+            // that is readable without native calls; 0 means animations are off.
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 return Run("reg", "query \"HKCU\\Control Panel\\Desktop\\WindowMetrics\" /v MinAnimate") is { } v && v.EndsWith('0');
@@ -45,7 +47,6 @@ public static class ReducedMotion
         using var process = Process.Start(new ProcessStartInfo(file, arguments)
         {
             RedirectStandardOutput = true,
-            RedirectStandardError = true,
             UseShellExecute = false,
         });
         var output = process?.StandardOutput.ReadToEnd().Trim();
