@@ -18,17 +18,19 @@ dotnet run --project src/Jarvis.VoiceBridge -- --server https://home-apps.dev --
 - **Using it:** "Hey Jarvis" (a rising chime) → say the request → after ~0.7 s of quiet a falling chime, the transcript
   and JARVIS's answer are printed and spoken (`afplay`). When he asks to confirm, a chime and 8 s for "tak" / "nie"
   without the wake word. Enter starts without the wake word, ends the utterance early, or stops JARVIS mid-answer;
-  `q` quits. While he speaks the microphone is ignored (a Mac has no echo cancellation here), so press Enter to interrupt him.
+  `q` quits. While he speaks the microphone is ignored, except for "stop" / "cisza" with local speech (see below); Enter always interrupts him.
 - **Tuning:** `--threshold` (0.5) is the wake word's score. `--save-recordings <folder>` keeps each turn as a WAV on
   this Mac only (V7); `--check-wake <file.wav>` prints the best score in a 16 kHz recording, e.g. one of yours, to pick a
   threshold. Synthetic English "hey jarvis" scores 0.96-0.99, unrelated speech 0.00; a Polish accent may score lower.
 - **Speech on this Mac (S1, D10):** speech is local by default (spec 2.1: the audio never leaves this computer) and only
-  text goes to the server. `--speech server` opts out (the server hears and speaks). Without `--engine` nothing else runs: Whisper (Whisper.net, GGML) hears and Piper (ONNX Runtime) speaks inside the bridge, so
-  `?speech=local` plays locally with no Speaches container. `--engine http://host:8000` still selects an external
-  OpenAI-audio engine (Speaches). See "Speech without Speaches" below.
+  text goes to the server. `--speech server` opts out (the server hears and speaks). Without `--engine` Whisper
+  (Whisper.net, GGML) hears and Piper (ONNX Runtime) speaks inside the bridge, so the server gets `?speech=local`
+  (text turns) and no Speaches container is needed. `--engine http://host:8000` selects an external OpenAI-audio
+  engine (Speaches) instead. See "Speech without Speaches" below.
 - **Follow-up window (D11):** after EVERY answer the microphone stays open for 8 s without the wake word; 8 s of
-  silence closes it. While JARVIS speaks only "stop" or "cisza" gets through (echo-gated against the playback); it
-  needs local speech (the default), because the bridge must hear the word itself.
+  silence closes it. While JARVIS speaks only "stop" or "cisza" gets through, checked by the echo gate against the
+  playback; it needs local speech (the default), because the bridge must hear the word itself. The gate is described
+  below, under "Speech without Speaches".
 - **One computer at a time (Q2 A):** when the server answers `{"type":"lease_conflict","code":"turn_in_progress"}`,
   another computer of the same person holds the turn: this bridge goes idle at once, sends nothing, plays nothing.
 - **Computer actions:** `--actions <file>` also connects this Mac as a device, so JARVIS can run the actions from the
@@ -83,13 +85,30 @@ Example for a Mac: `src/Jarvis.VoiceBridge/actions.macos.example.json`.
 ## Speech without Speaches (the default)
 
 The models are large and are NOT in git. Put them in `~/.homeapps/voice-bridge/models/` (or point `--stt-model` and
-`--tts-model` at them); the bridge says which file is missing.
+`--tts-model` at them); the bridge names the file that is missing at start.
 
 | File | Where from |
 |---|---|
 | `ggml-base.bin` (or `ggml-tiny.bin`, then `--stt-model`) | `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin` |
 | `pl_PL-gosia-medium.onnx` and `pl_PL-gosia-medium.onnx.json` | `https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/gosia/medium/` |
 
-Piper needs phonemes: install `espeak-ng` (macOS `brew install espeak-ng`, Linux `apt install espeak-ng`).
-Echo cancellation is a level gate against the WAV being played (a microphone frame counts only when clearly louder than
-the playback at that moment), not an adaptive filter: tune `EchoGate.Margin` if JARVIS interrupts himself.
+Download example (macOS / Linux):
+
+```bash
+mkdir -p ~/.homeapps/voice-bridge/models && cd ~/.homeapps/voice-bridge/models
+curl -LO https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
+curl -LO https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/gosia/medium/pl_PL-gosia-medium.onnx
+curl -LO https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/gosia/medium/pl_PL-gosia-medium.onnx.json
+```
+
+Piper needs phonemes from the `espeak-ng` program, which the bridge starts itself, so it must be installed and on the
+`PATH`: macOS `brew install espeak-ng`, Linux `apt install espeak-ng`, Windows install the espeak-ng package and make
+sure its folder is on `PATH` (then open a new terminal). Without it, speaking an answer fails with "espeak-ng is not installed".
+
+Echo cancellation is a level gate (`EchoGate`) against the WAV being played, not an adaptive filter: a microphone frame
+counts as the person's voice only when it is louder than both 500 and 1.5 times the playback level at that moment.
+The thresholds are constants in `src/Jarvis.VoiceBridge.Core/EchoGate.cs` (`Margin`, `Floor`, `Latency`), not
+config options: if JARVIS interrupts himself, or "stop" is not heard, change the constant and rebuild.
+
+Playback of the answer uses the system's player: `afplay` on macOS, `aplay` on Linux, and PowerShell's `SoundPlayer` on
+Windows (see [desktop.md](desktop.md)).
