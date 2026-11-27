@@ -8,7 +8,7 @@ namespace Jarvis.VoiceBridge;
 /// last 76 frames one speech embedding, and the last 16 embeddings the model's score from 0 to 1. Nothing leaves the
 /// Mac until the score passes the threshold (jarvis-voice-bridge.md, V3).
 /// </summary>
-internal sealed class WakeWord : IDisposable
+internal sealed class WakeWord : IWakeWord, IDisposable
 {
     public const int FrameSamples = 1280;
 
