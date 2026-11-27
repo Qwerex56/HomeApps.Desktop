@@ -7,15 +7,17 @@ namespace Jarvis.VoiceBridge;
 /// <summary>
 /// The bridge's loop (jarvis-voice-bridge.md 1): the wake word listens locally; after "Hey Jarvis" (or Enter) the
 /// utterance streams to the server until the person is quiet; then the microphone is ignored while the server answers
-/// and JARVIS speaks. When he asks "tak czy nie?", the next answer is recorded without the wake word.
+/// and JARVIS speaks (only "stop" or "cisza" gets through, echo-cancelled). After EVERY answer the next utterance is
+/// recorded without the wake word for <see cref="FollowUpWindow.Length"/> (D11).
 /// </summary>
 internal sealed class Bridge(
-    BridgeOptions options, WakeWord wake, IAccessToken login, VoiceLink link, Microphone microphone, IBridgeOutput output)
+    BridgeOptions options, IWakeWord wake, IAccessToken login, VoiceLink link, IMicrophone microphone, ISpeaker speaker,
+    IBridgeOutput output, StopWordListener? stopWords = null)
     : IDisposable
 {
     private static readonly TimeSpan WaitAfterWake = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan WaitForAnswer = TimeSpan.FromSeconds(8);
 
+    /// <summary>The turn lock (ADR 2.5): one utterance at a time; the audio loop and every command take it.</summary>
     private readonly SemaphoreSlim _gate = new(1, 1);
     private BridgeState _state = BridgeState.Waiting;
     private EndOfSpeech _speech = new(WaitAfterWake);
@@ -24,6 +26,8 @@ internal sealed class Bridge(
     private bool _resetWake;
     private bool _muted;
     private CancellationTokenSource _playing = new();
+    private Task _playback = Task.CompletedTask;
+    private Task _stopCheck = Task.CompletedTask;
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {
@@ -47,6 +51,8 @@ internal sealed class Bridge(
         }
 
         await quit.CancelAsync();
+        await _playing.CancelAsync();
+        await Task.WhenAny(_playback, Task.Delay(TimeSpan.FromSeconds(2), CancellationToken.None));
         await Task.WhenAll(events, keys).ContinueWith(_ => { }, TaskScheduler.Default);
     }
 
@@ -87,7 +93,14 @@ internal sealed class Bridge(
                     }
 
                     break;
-                case BridgeState.Recording or BridgeState.Answering:
+                case BridgeState.Busy when stopWords is { Active: true }:
+                    if (stopWords.Push(frame) is { } heard && _stopCheck.IsCompleted)
+                    {
+                        _stopCheck = CheckStopWordAsync(stopWords, heard, _playing.Token, cancellationToken);
+                    }
+
+                    break;
+                case BridgeState.Recording or BridgeState.Answering or BridgeState.FollowUp:
                     await link.SendAudioAsync(frame, cancellationToken);
                     _recording?.AddRange(frame);
                     switch (_speech.Push(frame))
@@ -114,11 +127,12 @@ internal sealed class Bridge(
     /// <summary>Under the gate: the chime, then everything the microphone hears goes to the server.</summary>
     private async Task BeginAsync(BridgeState state, CancellationToken cancellationToken)
     {
+        await StopPlayingAsync();
         _state = state;
-        _speech = new EndOfSpeech(state == BridgeState.Answering ? WaitForAnswer : WaitAfterWake);
+        _speech = new EndOfSpeech(state is BridgeState.Answering or BridgeState.FollowUp ? FollowUpWindow.Length : WaitAfterWake);
         _recording = options.SaveRecordings is null ? null : [];
         output.State(BridgeStates.Listening);
-        await Speaker.PlayAsync(Chime.Listening, cancellationToken);
+        await speaker.PlayAsync(Chime.Listening, cancellationToken);
         microphone.Drain();
         await link.StartAsync(cancellationToken);
     }
@@ -129,7 +143,7 @@ internal sealed class Bridge(
         await link.StopAsync(cancellationToken);
         _state = BridgeState.Busy;
         output.State(BridgeStates.Thinking);
-        _ = Speaker.PlayAsync(Chime.Heard, cancellationToken);
+        _ = speaker.PlayAsync(Chime.Heard, cancellationToken);
         if (_recording is { Count: > 0 } recording && options.SaveRecordings is { } folder)
         {
             Directory.CreateDirectory(folder);
@@ -183,25 +197,44 @@ internal sealed class Bridge(
                 _awaiting = said.Flag("awaiting");
                 break;
             case "audio" when said.Wav is { } wav:
-                await SpeakAsync(wav, cancellationToken);
-                break;
-            case "done":
-                await UnderGateAsync(async () =>
+                // Nothing is played once the turn ended (stopped, lease_conflict).
+                // Played on its own task (sentences in order), so later events (lease_conflict, done) are not held up.
+                await UnderGateAsync(() =>
                 {
-                    if (_state != BridgeState.Busy)
+                    if (_state == BridgeState.Busy)
                     {
-                        return;
+                        var token = _playing.Token;
+                        var before = _playback;
+                        _playback = Task.Run(async () =>
+                        {
+                            await before.ContinueWith(_ => { }, TaskScheduler.Default);
+                            await SpeakAsync(wav, token, cancellationToken);
+                        }, CancellationToken.None);
                     }
 
-                    if (_awaiting && !said.Flag("cancelled"))
+                    return true;
+                }, cancellationToken);
+
+                break;
+            case "lease_conflict":
+                // Q2(A): another computer holds the turn: go silent and idle at once, send nothing, play nothing.
+                await UnderGateAsync(() => SilenceAsync(), cancellationToken);
+                break;
+            case "done":
+                // After the sentences still playing; the events loop itself stays free for lease_conflict and interrupts.
+                await UnderGateAsync(() =>
+                {
+                    var token = _playing.Token;
+                    var before = _playback;
+                    _playback = Task.Run(async () =>
                     {
-                        output.Confirm();
-                        await BeginAsync(BridgeState.Answering, cancellationToken);
-                    }
-                    else
-                    {
-                        BackToWaiting();
-                    }
+                        await before.ContinueWith(_ => { }, TaskScheduler.Default);
+                        if (!token.IsCancellationRequested)
+                        {
+                            await UnderGateAsync(() => OnDoneAsync(said, token, cancellationToken), cancellationToken);
+                        }
+                    }, CancellationToken.None).ContinueWith(_ => { }, TaskScheduler.Default);
+                    return true;
                 }, cancellationToken);
                 break;
             case "error":
@@ -213,6 +246,32 @@ internal sealed class Bridge(
                 await UnderGateAsync(() => { BackToWaiting(); return Task.CompletedTask; }, cancellationToken);
                 await ConnectAsync(cancellationToken);
                 break;
+        }
+    }
+
+    /// <summary>Under the gate: the answer is spoken; the next utterance is expected (D11) unless the turn stopped meanwhile.</summary>
+    private async Task OnDoneAsync(ServerEvent said, CancellationToken playing, CancellationToken cancellationToken)
+    {
+        if (_state != BridgeState.Busy || playing.IsCancellationRequested)
+        {
+            return;
+        }
+
+        // The turn is over: a slow stop-word check of it must not touch the next one.
+        await StopPlayingAsync();
+        var cancelled = said.Flag("cancelled");
+        if (_awaiting && !cancelled)
+        {
+            output.Confirm();
+            await BeginAsync(BridgeState.Answering, cancellationToken);
+        }
+        else if (FollowUpWindow.Opens(cancelled, _muted))
+        {
+            await BeginAsync(BridgeState.FollowUp, cancellationToken);
+        }
+        else
+        {
+            BackToWaiting();
         }
     }
 
@@ -248,7 +307,7 @@ internal sealed class Bridge(
                 Console.WriteLine("» Enter");
                 await BeginAsync(BridgeState.Recording, cancellationToken);
                 break;
-            case BridgeState.Recording or BridgeState.Answering:
+            case BridgeState.Recording or BridgeState.Answering or BridgeState.FollowUp:
                 await FinishAsync(cancellationToken);
                 break;
             case BridgeState.Busy:
@@ -257,26 +316,88 @@ internal sealed class Bridge(
         }
     }
 
+    /// <summary>Off the gate (the transcription is slow): a stop word interrupts only if this playback is still the current one.</summary>
+    private async Task CheckStopWordAsync(StopWordListener listener, short[] heard, CancellationToken playing, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (await listener.IsStopAsync(heard, playing))
+            {
+                await UnderGateAsync(async () =>
+                {
+                    if (_state == BridgeState.Busy && !playing.IsCancellationRequested && playing == _playing.Token)
+                    {
+                        await InterruptAsync(cancellationToken);
+                    }
+                }, cancellationToken);
+            }
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or ObjectDisposedException)
+        {
+            // Interrupted or quitting.
+        }
+        catch (Exception exception)
+        {
+            output.Error("voice.engine_failed", exception.Message);
+        }
+    }
+
     /// <summary>Under the gate: JARVIS stops speaking and the server drops the turn.</summary>
     private async Task InterruptAsync(CancellationToken cancellationToken)
     {
-        await _playing.CancelAsync();
-        _playing.Dispose();
-        _playing = new CancellationTokenSource();
+        await StopPlayingAsync();
         await link.CancelAsync(cancellationToken);
         Console.WriteLine("(przerwane)");
         BackToWaiting();
     }
 
-    /// <summary>Plays one sentence of the answer; with <c>--ipc</c> its loudness goes out for the hologram's pulse.</summary>
-    private async Task SpeakAsync(byte[] wav, CancellationToken cancellationToken)
+    /// <summary>Under the gate: the server gave the turn to another computer; nothing is sent back, nothing is played.</summary>
+    private async Task SilenceAsync()
     {
-        output.State(BridgeStates.Speaking);
-        using var pulse = CancellationTokenSource.CreateLinkedTokenSource(_playing.Token);
+        await StopPlayingAsync();
+        link.Drop();
+        _recording = null;
+        Console.WriteLine("(inny komputer odpowiada)");
+        BackToWaiting();
+    }
+
+    private async Task StopPlayingAsync()
+    {
+        stopWords?.End();
+        await _playing.CancelAsync();
+
+        // Not disposed: the playback task may still hold its token.
+        _playing = new CancellationTokenSource();
+    }
+
+    /// <summary>Plays one sentence of the answer; with <c>--ipc</c> its loudness goes out for the hologram's pulse.</summary>
+    private async Task SpeakAsync(byte[] wav, CancellationToken playing, CancellationToken cancellationToken)
+    {
+        if (playing.IsCancellationRequested || cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        if (!await TryUnderGateAsync(() =>
+            {
+                if (_state != BridgeState.Busy || playing.IsCancellationRequested)
+                {
+                    return false;
+                }
+
+                output.State(BridgeStates.Speaking);
+                return true;
+            }))
+        {
+            return;
+        }
+
+        using var pulse = CancellationTokenSource.CreateLinkedTokenSource(playing);
         var levels = options.Ipc ? PulseAsync(Loudness.Windows(wav), pulse.Token) : Task.CompletedTask;
+        stopWords?.Begin(wav);
         try
         {
-            await Speaker.PlayAsync(wav, _playing.Token);
+            await speaker.PlayAsync(wav, playing);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -284,13 +405,31 @@ internal sealed class Bridge(
         }
         finally
         {
+            stopWords?.End();
             await pulse.CancelAsync();
             await levels;
             output.Level(0);
-            if (_state == BridgeState.Busy)
+            await TryUnderGateAsync(() =>
             {
-                output.State(BridgeStates.Thinking);
-            }
+                if (_state == BridgeState.Busy && !playing.IsCancellationRequested)
+                {
+                    output.State(BridgeStates.Thinking);
+                }
+
+                return true;
+            });
+        }
+    }
+
+    private async Task<bool> TryUnderGateAsync(Func<bool> action)
+    {
+        try
+        {
+            return await UnderGateAsync(action, CancellationToken.None);
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
         }
     }
 
@@ -352,7 +491,7 @@ internal sealed class Bridge(
     {
         switch (_state)
         {
-            case BridgeState.Recording or BridgeState.Answering:
+            case BridgeState.Recording or BridgeState.Answering or BridgeState.FollowUp:
                 await link.CancelAsync(cancellationToken);
                 _recording = null;
                 BackToWaiting();
@@ -366,7 +505,7 @@ internal sealed class Bridge(
     private async Task OnMuteAsync(bool mute, CancellationToken cancellationToken)
     {
         _muted = mute;
-        if (mute && _state is BridgeState.Recording or BridgeState.Answering)
+        if (mute && _state is BridgeState.Recording or BridgeState.Answering or BridgeState.FollowUp)
         {
             await link.CancelAsync(cancellationToken);
             _recording = null;
@@ -375,6 +514,19 @@ internal sealed class Bridge(
         else if (_state == BridgeState.Waiting)
         {
             BackToWaiting();
+        }
+    }
+
+    private async Task<T> UnderGateAsync<T>(Func<T> read, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            return read();
+        }
+        finally
+        {
+            _gate.Release();
         }
     }
 

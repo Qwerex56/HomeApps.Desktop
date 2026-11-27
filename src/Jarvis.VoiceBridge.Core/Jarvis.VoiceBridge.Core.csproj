@@ -9,6 +9,8 @@
   <ItemGroup>
     <PackageReference Include="PortAudioSharp2" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+    <PackageReference Include="Whisper.net" />
+    <PackageReference Include="Whisper.net.Runtime" />
   </ItemGroup>
 
   <ItemGroup>

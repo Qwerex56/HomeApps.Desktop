@@ -8,7 +8,7 @@ namespace Jarvis.VoiceBridge;
 /// The default microphone through PortAudio, as 16 kHz mono frames of <see cref="WakeWord.FrameSamples"/> samples
 /// (80 ms). The first run asks macOS for microphone access for the terminal.
 /// </summary>
-internal sealed class Microphone : IDisposable
+internal sealed class Microphone : IMicrophone, IDisposable
 {
     public const int SampleRate = 16_000;
 

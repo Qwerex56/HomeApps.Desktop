@@ -7,7 +7,7 @@ namespace Jarvis.VoiceBridge;
 /// S1: the bridge's own ears and voice, the same OpenAI audio API JARVIS uses on the server (Speaches on this Mac by
 /// default), so the server gets only text and needs no speech engine.
 /// </summary>
-internal sealed class LocalSpeech(HttpClient http, Uri engine)
+internal sealed class LocalSpeech(HttpClient http, Uri engine) : ISpeechEngine
 {
     public async Task<string> TranscribeAsync(short[] pcm, CancellationToken cancellationToken)
     {

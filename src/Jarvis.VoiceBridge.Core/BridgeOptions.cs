@@ -9,13 +9,19 @@ namespace Jarvis.VoiceBridge;
 /// <param name="Insecure">Accept the dev certificate of https://app.localhost.</param>
 /// <param name="SaveRecordings">V7: a folder where each turn's audio is kept, only on this computer.</param>
 /// <param name="CheckWake">A WAV file to score with the wake word, then exit (to tune the threshold).</param>
-/// <param name="Engine">S1: with <c>--speech local</c> the bridge's own speech engine (OpenAI audio API, e.g. Speaches on
-/// this Mac); the server then only gets and gives text. <c>null</c>: the server hears and speaks.</param>
+/// <param name="Engine">S1: <c>--engine http://…</c>: an external speech engine (OpenAI audio API, e.g. Speaches) instead
+/// of the in-process Whisper and Piper (the default); <c>null</c>: none, unless <c>--speech server</c> (no local speech).</param>
 /// <param name="Actions">A JSON file with what this computer offers JARVIS (jarvis-satellites.md, S-0); <c>null</c>: nothing.</param>
 /// <param name="Pair">S-1e: a pairing code from the household's Urządzenia page; the bridge becomes that household's satellite.</param>
 /// <param name="Unpair">Forget the satellite's pairing on this computer; the bridge is the person's again.</param>
 /// <param name="Ipc">S-2b: run as the hologram app's engine: JSON lines on stdout and stdin instead of a terminal.</param>
 /// <param name="Hosted">The bridge runs inside the tray app: no terminal keys, no stdin commands.</param>
+/// <param name="SpeechLocal">D10, spec 2.1: speech is local by default: the audio never leaves this computer, the server only
+/// gets and gives text. Without <c>--engine</c> Whisper and Piper run inside the bridge; <c>--speech server</c> opts out
+/// (the server hears and speaks).</param>
+/// <param name="SttModelPath"><c>--stt-model</c>: the GGML Whisper file; default <c>ggml-base.bin</c> in the models folder.</param>
+/// <param name="TtsModelPath"><c>--tts-model</c>: the Piper voice <c>.onnx</c> (its <c>.onnx.json</c> beside it); default
+/// <c>pl_PL-gosia-medium.onnx</c> in the models folder.</param>
 /// <param name="Link">S-2e: keep this computer on the Devices link even without actions, so it shows in Konto → Komputery.</param>
 internal sealed record BridgeOptions(
     Uri Server,
@@ -31,13 +37,20 @@ internal sealed record BridgeOptions(
     bool Unpair = false,
     bool Ipc = false,
     bool Link = false,
-    bool Hosted = false)
+    bool Hosted = false,
+    bool SpeechLocal = true,
+    string? SttModelPath = null,
+    string? TtsModelPath = null)
 {
     public const string SttModel = "deepdml/faster-whisper-large-v3-turbo-ct2";
     public const string TtsModel = "speaches-ai/piper-pl_PL-gosia-medium";
     public const string TtsVoice = "gosia";
 
-    public bool LocalSpeech => Engine is not null;
+    public bool LocalSpeech => SpeechLocal;
+
+    public string SttModelFile => SttModelPath ?? Path.Combine(Home, "models", "ggml-base.bin");
+
+    public string TtsModelFile => TtsModelPath ?? Path.Combine(Home, "models", "pl_PL-gosia-medium.onnx");
 
     /// <summary>The name it registers under in "Połączone aplikacje": the hologram app is "JARVIS na komputerze".</summary>
     public string ClientName => Ipc ? $"JARVIS na komputerze ({Device})" : $"JARVIS: most głosowy ({Device})";
@@ -60,7 +73,8 @@ internal sealed record BridgeOptions(
         }
 
         var server = Value("--server") ?? Environment.GetEnvironmentVariable("HOMEAPPS_URL") ?? "https://home-apps.dev";
-        var engine = Value("--speech") == "local" ? Value("--engine") ?? "http://localhost:8000" : null;
+        var speechLocal = Value("--speech") != "server";
+        var engine = speechLocal ? Value("--engine") : null;
         return new BridgeOptions(
             new Uri(server.TrimEnd('/') + "/"),
             Value("--device") ?? Environment.MachineName,
@@ -74,6 +88,10 @@ internal sealed record BridgeOptions(
             Value("--pair"),
             args.Contains("--unpair"),
             args.Contains("--ipc"),
-            args.Contains("--link"));
+            args.Contains("--link"),
+            Hosted: false,
+            SpeechLocal: speechLocal,
+            SttModelPath: Value("--stt-model"),
+            TtsModelPath: Value("--tts-model"));
     }
 }

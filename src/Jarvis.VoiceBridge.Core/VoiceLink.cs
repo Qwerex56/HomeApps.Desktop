@@ -12,7 +12,7 @@ namespace Jarvis.VoiceBridge;
 /// With <paramref name="speech"/> (S1) the audio stays here: it is transcribed locally and sent as <c>say</c>, and the
 /// reply is spoken locally, as the same <c>audio</c> events the bridge plays.
 /// </summary>
-internal sealed partial class VoiceLink(BridgeOptions options, LocalSpeech? speech = null) : IAsyncDisposable
+internal sealed partial class VoiceLink(BridgeOptions options, ISpeechEngine? speech = null) : IAsyncDisposable
 {
     private readonly List<short> _heard = [];
     private readonly SemaphoreSlim _sending = new(1, 1);
@@ -79,6 +79,15 @@ internal sealed partial class VoiceLink(BridgeOptions options, LocalSpeech? spee
         return SendAsync(new { type = "stop" }, cancellationToken);
     }
 
+    /// <summary>The server ended the turn itself (<c>lease_conflict</c>): forget what was heard, send nothing.</summary>
+    public void Drop()
+    {
+        lock (_heard)
+        {
+            _heard.Clear();
+        }
+    }
+
     public Task CancelAsync(CancellationToken cancellationToken)
     {
         lock (_heard)
@@ -122,7 +131,7 @@ internal sealed partial class VoiceLink(BridgeOptions options, LocalSpeech? spee
     }
 
     /// <summary>S1: hears the utterance here; nothing heard ends the turn without asking the server.</summary>
-    private async Task SayAsync(LocalSpeech local, short[] heard, CancellationToken cancellationToken)
+    private async Task SayAsync(ISpeechEngine local, short[] heard, CancellationToken cancellationToken)
     {
         try
         {
@@ -140,6 +149,11 @@ internal sealed partial class VoiceLink(BridgeOptions options, LocalSpeech? spee
         {
             await LocalEventAsync(new { type = "error", code = "voice.engine_unavailable", detail = options.Engine?.ToString() }, cancellationToken);
         }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // In-process models (missing file, ONNX/Whisper failure): the turn ends, the bridge does not wait.
+            await LocalEventAsync(new { type = "error", code = "voice.engine_failed", detail = exception.Message }, cancellationToken);
+        }
         catch (OperationCanceledException)
         {
             // Quitting.
@@ -147,7 +161,7 @@ internal sealed partial class VoiceLink(BridgeOptions options, LocalSpeech? spee
     }
 
     /// <summary>S1: JARVIS's answer spoken here, sentence by sentence, as the server would have sent it.</summary>
-    private async Task SpeakAsync(LocalSpeech local, string text, CancellationToken cancellationToken)
+    private async Task SpeakAsync(ISpeechEngine local, string text, CancellationToken cancellationToken)
     {
         foreach (var sentence in Sentence().Split(text.Trim()).Where(s => s.Length > 0))
         {
@@ -160,6 +174,11 @@ internal sealed partial class VoiceLink(BridgeOptions options, LocalSpeech? spee
             catch (HttpRequestException)
             {
                 await LocalEventAsync(new { type = "error", code = "voice.engine_unavailable", detail = options.Engine?.ToString() }, cancellationToken);
+                return;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                await LocalEventAsync(new { type = "error", code = "voice.engine_failed", detail = exception.Message }, cancellationToken);
                 return;
             }
         }
@@ -247,11 +266,13 @@ internal sealed partial class VoiceLink(BridgeOptions options, LocalSpeech? spee
                 }
             }
         }
-        catch (Exception exception) when (exception is WebSocketException or OperationCanceledException)
+        catch (Exception exception) when (exception is WebSocketException or OperationCanceledException or JsonException)
         {
             // Closed: the bridge sees the link is down and reconnects.
         }
-
-        await _events.Writer.WriteAsync(new ServerEvent("closed", default), CancellationToken.None);
+        finally
+        {
+            await _events.Writer.WriteAsync(new ServerEvent("closed", default), CancellationToken.None);
+        }
     }
 }
