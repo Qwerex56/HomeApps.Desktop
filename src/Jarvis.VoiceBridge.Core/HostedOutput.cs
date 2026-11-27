@@ -21,5 +21,11 @@ internal sealed class HostedOutput(Action<string> onState) : IBridgeOutput
 
     public void Error(string? code, string? detail) => Console.Error.WriteLine($"Błąd serwera: {code} {detail}".TrimEnd());
 
-    public void Login(string url) => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true })?.Dispose();
+    public void Login(string url)
+    {
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
+        {
+            Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true })?.Dispose();
+        }
+    }
 }

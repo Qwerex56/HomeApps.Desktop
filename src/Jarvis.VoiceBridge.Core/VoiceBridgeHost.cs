@@ -4,6 +4,7 @@ namespace Jarvis.VoiceBridge;
 public sealed class VoiceBridgeHost(Action<string> onState)
 {
     private volatile Bridge? _bridge;
+    private volatile bool _muted;
 
     /// <summary>Runs until <paramref name="cancellationToken"/> is cancelled. <paramref name="args"/> are the bridge's command-line options.</summary>
     public async Task RunAsync(string[] args, CancellationToken cancellationToken)
@@ -30,17 +31,32 @@ public sealed class VoiceBridgeHost(Action<string> onState)
         _bridge = bridge;
         try
         {
+            if (_muted)
+            {
+                // Muted before the bridge was up.
+                await bridge.SetMutedAsync(true, cancellationToken);
+            }
+
             await bridge.RunAsync(cancellationToken);
         }
         finally
         {
             _bridge = null;
+            try
+            {
+                await linked;
+            }
+            catch (OperationCanceledException)
+            {
+                // Quitting.
+            }
         }
-
-        await linked;
     }
 
-    /// <summary>Mutes or unmutes the microphone; does nothing while the bridge is not running.</summary>
-    public Task SetMutedAsync(bool mute, CancellationToken cancellationToken = default) =>
-        _bridge?.SetMutedAsync(mute, cancellationToken) ?? Task.CompletedTask;
+    /// <summary>Mutes or unmutes the microphone; before the bridge runs, the choice is applied when it starts.</summary>
+    public Task SetMutedAsync(bool mute, CancellationToken cancellationToken = default)
+    {
+        _muted = mute;
+        return _bridge?.SetMutedAsync(mute, cancellationToken) ?? Task.CompletedTask;
+    }
 }
