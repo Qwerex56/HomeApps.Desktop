@@ -220,27 +220,20 @@ internal sealed class Bridge(
                 await UnderGateAsync(() => SilenceAsync(), cancellationToken);
                 break;
             case "done":
-                await UnderGateAsync(async () =>
+                // After the sentences still playing; the events loop itself stays free for lease_conflict and interrupts.
+                await UnderGateAsync(() =>
                 {
-                    if (_state != BridgeState.Busy)
+                    var token = _playing.Token;
+                    var before = _playback;
+                    _playback = Task.Run(async () =>
                     {
-                        return;
-                    }
-
-                    var cancelled = said.Flag("cancelled");
-                    if (_awaiting && !cancelled)
-                    {
-                        output.Confirm();
-                        await BeginAsync(BridgeState.Answering, cancellationToken);
-                    }
-                    else if (FollowUpWindow.Opens(cancelled, _muted))
-                    {
-                        await BeginAsync(BridgeState.FollowUp, cancellationToken);
-                    }
-                    else
-                    {
-                        BackToWaiting();
-                    }
+                        await before.ContinueWith(_ => { }, TaskScheduler.Default);
+                        if (!token.IsCancellationRequested)
+                        {
+                            await UnderGateAsync(() => OnDoneAsync(said, token, cancellationToken), cancellationToken);
+                        }
+                    }, CancellationToken.None).ContinueWith(_ => { }, TaskScheduler.Default);
+                    return true;
                 }, cancellationToken);
                 break;
             case "error":
@@ -252,6 +245,30 @@ internal sealed class Bridge(
                 await UnderGateAsync(() => { BackToWaiting(); return Task.CompletedTask; }, cancellationToken);
                 await ConnectAsync(cancellationToken);
                 break;
+        }
+    }
+
+    /// <summary>Under the gate: the answer is spoken; the next utterance is expected (D11) unless the turn stopped meanwhile.</summary>
+    private async Task OnDoneAsync(ServerEvent said, CancellationToken playing, CancellationToken cancellationToken)
+    {
+        if (_state != BridgeState.Busy || playing.IsCancellationRequested)
+        {
+            return;
+        }
+
+        var cancelled = said.Flag("cancelled");
+        if (_awaiting && !cancelled)
+        {
+            output.Confirm();
+            await BeginAsync(BridgeState.Answering, cancellationToken);
+        }
+        else if (FollowUpWindow.Opens(cancelled, _muted))
+        {
+            await BeginAsync(BridgeState.FollowUp, cancellationToken);
+        }
+        else
+        {
+            BackToWaiting();
         }
     }
 
@@ -319,7 +336,8 @@ internal sealed class Bridge(
     {
         stopWords?.End();
         await _playing.CancelAsync();
-        _playing.Dispose();
+
+        // Not disposed: the playback task may still hold its token.
         _playing = new CancellationTokenSource();
     }
 
@@ -331,7 +349,20 @@ internal sealed class Bridge(
             return;
         }
 
-        output.State(BridgeStates.Speaking);
+        if (!await TryUnderGateAsync(() =>
+            {
+                if (_state != BridgeState.Busy || playing.IsCancellationRequested)
+                {
+                    return false;
+                }
+
+                output.State(BridgeStates.Speaking);
+                return true;
+            }))
+        {
+            return;
+        }
+
         using var pulse = CancellationTokenSource.CreateLinkedTokenSource(playing);
         var levels = options.Ipc ? PulseAsync(Loudness.Windows(wav), pulse.Token) : Task.CompletedTask;
         stopWords?.Begin(wav);
@@ -349,10 +380,27 @@ internal sealed class Bridge(
             await pulse.CancelAsync();
             await levels;
             output.Level(0);
-            if (_state == BridgeState.Busy)
+            await TryUnderGateAsync(() =>
             {
-                output.State(BridgeStates.Thinking);
-            }
+                if (_state == BridgeState.Busy && !playing.IsCancellationRequested)
+                {
+                    output.State(BridgeStates.Thinking);
+                }
+
+                return true;
+            });
+        }
+    }
+
+    private async Task<bool> TryUnderGateAsync(Func<bool> action)
+    {
+        try
+        {
+            return await UnderGateAsync(action, CancellationToken.None);
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
         }
     }
 

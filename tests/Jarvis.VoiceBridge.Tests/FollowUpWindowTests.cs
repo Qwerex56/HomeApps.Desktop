@@ -57,4 +57,23 @@ public sealed class FollowUpWindowTests
         bed.Mic.Push(Frames.For(TimeSpan.FromSeconds(1), Frames.Speech));
         await Wait.UntilAsync(() => bed.Server.Binary > before, "follow-up audio reaches the server");
     }
+
+    [Fact]
+    public async Task The_window_opens_only_after_the_sentence_that_precedes_done_has_been_played()
+    {
+        await using var bed = new BridgeTestBed();
+        await bed.SpeakToJarvisAsync();
+        await bed.FinishUtteranceAsync();
+        bed.Speaker.Block = true;
+        bed.Speaker.Hold = TimeSpan.FromMilliseconds(1200);
+
+        await bed.Server.SendAsync("""{"type":"audio","format":"wav"}""");
+        await bed.Server.SendBinaryAsync(FakeSpeechEngine.Silence());
+        await bed.Server.SendAsync("""{"type":"done"}""");
+        await Wait.UntilAsync(() => bed.Output.Last == BridgeStates.Speaking, "speaking");
+        await Task.Delay(500);
+
+        Assert.Equal(1, bed.Output.Count(BridgeStates.Listening));
+        await Wait.UntilAsync(() => bed.Output.Count(BridgeStates.Listening) == 2, "the window opens after the playback");
+    }
 }
