@@ -23,6 +23,8 @@ internal sealed class BridgeTestBed : IAsyncDisposable
 
     public FakeVoiceServer Server { get; }
 
+    public Bridge Bridge => _bridge;
+
     public FakeMicrophone Mic { get; } = new();
 
     public FakeWakeWord Wake { get; } = new();

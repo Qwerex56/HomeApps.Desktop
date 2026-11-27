@@ -8,6 +8,9 @@ internal sealed class FakeSpeaker : ISpeaker
 
     public volatile bool Block;
 
+    /// <summary>How long a blocking sound lasts when it is not cancelled (infinite by default).</summary>
+    public TimeSpan Hold { get; set; } = Timeout.InfiniteTimeSpan;
+
     public int Played => _played;
 
     public int Cancelled => _cancelled;
@@ -19,7 +22,7 @@ internal sealed class FakeSpeaker : ISpeaker
         {
             try
             {
-                await Task.Delay(Timeout.Infinite, cancellationToken);
+                await Task.Delay(Hold, cancellationToken);
             }
             catch (OperationCanceledException)
             {
