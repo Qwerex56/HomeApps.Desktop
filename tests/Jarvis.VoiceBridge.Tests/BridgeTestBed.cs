@@ -8,11 +8,11 @@ internal sealed class BridgeTestBed : IAsyncDisposable
     private readonly Bridge _bridge;
     private readonly Task _running;
 
-    public BridgeTestBed(string heard = "stop")
+    public BridgeTestBed(string heard = "stop", ISpeechEngine? linkSpeech = null)
     {
         Server = new FakeVoiceServer();
         var options = new BridgeOptions(Server.Url, "test", 0.5f, false, null, null, false, Hosted: true);
-        _link = new VoiceLink(options);
+        _link = new VoiceLink(options, linkSpeech);
         Speech = new FakeSpeechEngine(heard);
         var clock = System.Diagnostics.Stopwatch.StartNew();
         _bridge = new Bridge(

@@ -16,8 +16,9 @@ namespace Jarvis.VoiceBridge;
 /// <param name="Unpair">Forget the satellite's pairing on this computer; the bridge is the person's again.</param>
 /// <param name="Ipc">S-2b: run as the hologram app's engine: JSON lines on stdout and stdin instead of a terminal.</param>
 /// <param name="Hosted">The bridge runs inside the tray app: no terminal keys, no stdin commands.</param>
-/// <param name="SpeechLocal">D10: <c>--speech local</c>: the audio stays here, the server only gets and gives text. Without
-/// <c>--engine</c> Whisper and Piper run inside the bridge; <c>false</c>: the server hears and speaks.</param>
+/// <param name="SpeechLocal">D10, spec 2.1: speech is local by default: the audio never leaves this computer, the server only
+/// gets and gives text. Without <c>--engine</c> Whisper and Piper run inside the bridge; <c>--speech server</c> opts out
+/// (the server hears and speaks).</param>
 /// <param name="SttModelPath"><c>--stt-model</c>: the GGML Whisper file; default <c>ggml-base.bin</c> in the models folder.</param>
 /// <param name="TtsModelPath"><c>--tts-model</c>: the Piper voice <c>.onnx</c> (its <c>.onnx.json</c> beside it); default
 /// <c>pl_PL-gosia-medium.onnx</c> in the models folder.</param>
@@ -37,7 +38,7 @@ internal sealed record BridgeOptions(
     bool Ipc = false,
     bool Link = false,
     bool Hosted = false,
-    bool SpeechLocal = false,
+    bool SpeechLocal = true,
     string? SttModelPath = null,
     string? TtsModelPath = null)
 {
@@ -72,7 +73,7 @@ internal sealed record BridgeOptions(
         }
 
         var server = Value("--server") ?? Environment.GetEnvironmentVariable("HOMEAPPS_URL") ?? "https://home-apps.dev";
-        var speechLocal = Value("--speech") == "local";
+        var speechLocal = Value("--speech") != "server";
         var engine = speechLocal ? Value("--engine") : null;
         return new BridgeOptions(
             new Uri(server.TrimEnd('/') + "/"),

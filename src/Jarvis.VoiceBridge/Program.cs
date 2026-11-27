@@ -3,7 +3,7 @@ using Jarvis.VoiceBridge;
 // JARVIS's ears and mouth on the Mac (jarvis-voice-bridge.md, docs/jarvis.md "Voice bridge").
 //   dotnet run --project src/Jarvis.VoiceBridge -- [--server https://home-apps.dev] [--device mac-biuro]
 //     [--threshold 0.5] [--insecure] [--save-recordings ~/jarvis-nagrania] [--check-wake plik.wav] [--logout]
-//     [--speech local [--engine http://localhost:8000] [--stt-model ggml.bin] [--tts-model voice.onnx]] [--actions akcje.json] [--pair ABCD-EFGH] [--unpair] [--ipc] [--link]
+//     [--speech server | [--engine http://localhost:8000] [--stt-model ggml.bin] [--tts-model voice.onnx]] [--actions akcje.json] [--pair ABCD-EFGH] [--unpair] [--ipc] [--link]
 var options = BridgeOptions.Parse(args);
 
 // --ipc (S-2b): stdout carries only the JSON events for the hologram app; everything else people read goes to stderr.

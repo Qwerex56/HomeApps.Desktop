@@ -76,7 +76,8 @@ public sealed class AudioEngineTests
         Assert.Equal(new Uri("http://x:8000/"), options.Engine);
         Assert.Equal("/m/tiny.bin", options.SttModelFile);
         Assert.Equal("/m/v.onnx", options.TtsModelFile);
-        Assert.False(BridgeOptions.Parse([]).LocalSpeech);
+        Assert.True(BridgeOptions.Parse([]).LocalSpeech);
+        Assert.False(BridgeOptions.Parse(["--speech", "server"]).LocalSpeech);
     }
 
     [Fact]

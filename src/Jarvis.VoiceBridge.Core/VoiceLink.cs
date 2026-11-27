@@ -149,6 +149,11 @@ internal sealed partial class VoiceLink(BridgeOptions options, ISpeechEngine? sp
         {
             await LocalEventAsync(new { type = "error", code = "voice.engine_unavailable", detail = options.Engine?.ToString() }, cancellationToken);
         }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // In-process models (missing file, ONNX/Whisper failure): the turn ends, the bridge does not wait.
+            await LocalEventAsync(new { type = "error", code = "voice.engine_failed", detail = exception.Message }, cancellationToken);
+        }
         catch (OperationCanceledException)
         {
             // Quitting.
@@ -169,6 +174,11 @@ internal sealed partial class VoiceLink(BridgeOptions options, ISpeechEngine? sp
             catch (HttpRequestException)
             {
                 await LocalEventAsync(new { type = "error", code = "voice.engine_unavailable", detail = options.Engine?.ToString() }, cancellationToken);
+                return;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                await LocalEventAsync(new { type = "error", code = "voice.engine_failed", detail = exception.Message }, cancellationToken);
                 return;
             }
         }
@@ -256,11 +266,13 @@ internal sealed partial class VoiceLink(BridgeOptions options, ISpeechEngine? sp
                 }
             }
         }
-        catch (Exception exception) when (exception is WebSocketException or OperationCanceledException)
+        catch (Exception exception) when (exception is WebSocketException or OperationCanceledException or JsonException)
         {
             // Closed: the bridge sees the link is down and reconnects.
         }
-
-        await _events.Writer.WriteAsync(new ServerEvent("closed", default), CancellationToken.None);
+        finally
+        {
+            await _events.Writer.WriteAsync(new ServerEvent("closed", default), CancellationToken.None);
+        }
     }
 }

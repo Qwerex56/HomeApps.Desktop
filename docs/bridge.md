@@ -22,13 +22,13 @@ dotnet run --project src/Jarvis.VoiceBridge -- --server https://home-apps.dev --
 - **Tuning:** `--threshold` (0.5) is the wake word's score. `--save-recordings <folder>` keeps each turn as a WAV on
   this Mac only (V7); `--check-wake <file.wav>` prints the best score in a 16 kHz recording, e.g. one of yours, to pick a
   threshold. Synthetic English "hey jarvis" scores 0.96-0.99, unrelated speech 0.00; a Polish accent may score lower.
-- **Speech on this Mac (S1, D10):** `--speech local` keeps the sound here and only text goes to the server. Without
-  `--engine` nothing else runs: Whisper (Whisper.net, GGML) hears and Piper (ONNX Runtime) speaks inside the bridge, so
+- **Speech on this Mac (S1, D10):** speech is local by default (spec 2.1: the audio never leaves this computer) and only
+  text goes to the server. `--speech server` opts out (the server hears and speaks). Without `--engine` nothing else runs: Whisper (Whisper.net, GGML) hears and Piper (ONNX Runtime) speaks inside the bridge, so
   `?speech=local` plays locally with no Speaches container. `--engine http://host:8000` still selects an external
   OpenAI-audio engine (Speaches). See "Speech without Speaches" below.
 - **Follow-up window (D11):** after EVERY answer the microphone stays open for 8 s without the wake word; 8 s of
   silence closes it. While JARVIS speaks only "stop" or "cisza" gets through (echo-gated against the playback); it
-  needs `--speech local`, because the bridge must hear the word itself.
+  needs local speech (the default), because the bridge must hear the word itself.
 - **One computer at a time (Q2 A):** when the server answers `{"type":"lease_conflict","code":"turn_in_progress"}`,
   another computer of the same person holds the turn: this bridge goes idle at once, sends nothing, plays nothing.
 - **Computer actions:** `--actions <file>` also connects this Mac as a device, so JARVIS can run the actions from the
@@ -80,7 +80,7 @@ and `JARVIS_INPUT` for the whole JSON, so quote them (`"$JARVIS_TEXT"`); never p
 command has 15 s, and the first 2000 characters of its output (or of its errors when it fails) are JARVIS's answer.
 Example for a Mac: `src/Jarvis.VoiceBridge/actions.macos.example.json`.
 
-## Speech without Speaches (`--speech local`)
+## Speech without Speaches (the default)
 
 The models are large and are NOT in git. Put them in `~/.homeapps/voice-bridge/models/` (or point `--stt-model` and
 `--tts-model` at them); the bridge says which file is missing.
