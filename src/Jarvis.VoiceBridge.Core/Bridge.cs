@@ -33,7 +33,7 @@ internal sealed class Bridge(
             ? $"Mikrofon: {microphone.Name}."
             : $"Mikrofon: {microphone.Name}. Powiedz „Hey Jarvis” albo naciśnij Enter; q kończy.");
         var events = EventsAsync(quit.Token);
-        var keys = options.Ipc ? CommandsAsync(quit) : Task.Run(() => KeysAsync(quit), quit.Token);
+        var keys = options.Hosted ? Task.CompletedTask : options.Ipc ? CommandsAsync(quit) : Task.Run(() => KeysAsync(quit), quit.Token);
         try
         {
             await foreach (var frame in microphone.Frames.ReadAllAsync(quit.Token))
@@ -49,6 +49,10 @@ internal sealed class Bridge(
         await quit.CancelAsync();
         await Task.WhenAll(events, keys).ContinueWith(_ => { }, TaskScheduler.Default);
     }
+
+    /// <summary>Mutes or unmutes the microphone (the tray app's hotkey and menu).</summary>
+    public Task SetMutedAsync(bool mute, CancellationToken cancellationToken) =>
+        UnderGateAsync(() => OnMuteAsync(mute, cancellationToken), cancellationToken);
 
     public void Dispose()
     {

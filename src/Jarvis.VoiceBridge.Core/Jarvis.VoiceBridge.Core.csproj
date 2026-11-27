@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The bridge's logic (wake word, speech, server links) shared by the terminal bridge and the tray app. -->
+  <PropertyGroup>
+    <RootNamespace>Jarvis.VoiceBridge</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="PortAudioSharp2" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="jarvis-voice-bridge" />
+    <InternalsVisibleTo Include="HomeApps.Desktop" />
+    <InternalsVisibleTo Include="Jarvis.VoiceBridge.Tests" />
+    <InternalsVisibleTo Include="Jarvis.Desktop.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -15,6 +15,7 @@ namespace Jarvis.VoiceBridge;
 /// <param name="Pair">S-1e: a pairing code from the household's Urządzenia page; the bridge becomes that household's satellite.</param>
 /// <param name="Unpair">Forget the satellite's pairing on this computer; the bridge is the person's again.</param>
 /// <param name="Ipc">S-2b: run as the hologram app's engine: JSON lines on stdout and stdin instead of a terminal.</param>
+/// <param name="Hosted">The bridge runs inside the tray app: no terminal keys, no stdin commands.</param>
 /// <param name="Link">S-2e: keep this computer on the Devices link even without actions, so it shows in Konto → Komputery.</param>
 internal sealed record BridgeOptions(
     Uri Server,
@@ -29,7 +30,8 @@ internal sealed record BridgeOptions(
     string? Pair = null,
     bool Unpair = false,
     bool Ipc = false,
-    bool Link = false)
+    bool Link = false,
+    bool Hosted = false)
 {
     public const string SttModel = "deepdml/faster-whisper-large-v3-turbo-ct2";
     public const string TtsModel = "speaches-ai/piper-pl_PL-gosia-medium";

@@ -8,3 +8,5 @@ riderModule.iml
 
 # Packages from scripts/package-*.sh (S-2f).
 build/
+
+.agents/runs/
