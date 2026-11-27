@@ -26,6 +26,7 @@ internal sealed class Bridge(
     private bool _resetWake;
     private bool _muted;
     private CancellationTokenSource _playing = new();
+    private Task _playback = Task.CompletedTask;
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {
@@ -49,6 +50,8 @@ internal sealed class Bridge(
         }
 
         await quit.CancelAsync();
+        await _playing.CancelAsync();
+        await Task.WhenAny(_playback, Task.Delay(TimeSpan.FromSeconds(2), CancellationToken.None));
         await Task.WhenAll(events, keys).ContinueWith(_ => { }, TaskScheduler.Default);
     }
 
@@ -194,10 +197,22 @@ internal sealed class Bridge(
                 break;
             case "audio" when said.Wav is { } wav:
                 // Nothing is played once the turn ended (stopped, lease_conflict).
-                if (await UnderGateAsync(() => _state == BridgeState.Busy, cancellationToken))
+                // Played on its own task (sentences in order), so later events (lease_conflict, done) are not held up.
+                await UnderGateAsync(() =>
                 {
-                    await SpeakAsync(wav, cancellationToken);
-                }
+                    if (_state == BridgeState.Busy)
+                    {
+                        var token = _playing.Token;
+                        var before = _playback;
+                        _playback = Task.Run(async () =>
+                        {
+                            await before.ContinueWith(_ => { }, TaskScheduler.Default);
+                            await SpeakAsync(wav, token, cancellationToken);
+                        }, CancellationToken.None);
+                    }
+
+                    return true;
+                }, cancellationToken);
 
                 break;
             case "lease_conflict":
@@ -309,15 +324,20 @@ internal sealed class Bridge(
     }
 
     /// <summary>Plays one sentence of the answer; with <c>--ipc</c> its loudness goes out for the hologram's pulse.</summary>
-    private async Task SpeakAsync(byte[] wav, CancellationToken cancellationToken)
+    private async Task SpeakAsync(byte[] wav, CancellationToken playing, CancellationToken cancellationToken)
     {
+        if (playing.IsCancellationRequested || cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
         output.State(BridgeStates.Speaking);
-        using var pulse = CancellationTokenSource.CreateLinkedTokenSource(_playing.Token);
+        using var pulse = CancellationTokenSource.CreateLinkedTokenSource(playing);
         var levels = options.Ipc ? PulseAsync(Loudness.Windows(wav), pulse.Token) : Task.CompletedTask;
         stopWords?.Begin(wav);
         try
         {
-            await speaker.PlayAsync(wav, _playing.Token);
+            await speaker.PlayAsync(wav, playing);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {

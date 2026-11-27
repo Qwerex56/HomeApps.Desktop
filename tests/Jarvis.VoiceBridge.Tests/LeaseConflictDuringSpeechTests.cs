@@ -10,7 +10,6 @@ public sealed class LeaseConflictDuringSpeechTests
         await bed.SpeakToJarvisAsync();
         await bed.FinishUtteranceAsync();
         bed.Speaker.Block = true;
-        bed.Speaker.Hold = TimeSpan.FromSeconds(3);
 
         await bed.Server.SendAsync("""{"type":"audio","format":"wav"}""");
         await bed.Server.SendBinaryAsync(FakeSpeechEngine.Silence());
