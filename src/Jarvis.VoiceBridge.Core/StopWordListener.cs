@@ -7,6 +7,7 @@ namespace Jarvis.VoiceBridge;
 internal sealed class StopWordListener(Func<short[], CancellationToken, Task<string>> transcribe, Func<TimeSpan> clock)
 {
     private const int PauseFrames = 5;
+    private const int MinimumSpeechFrames = 2;
     private const int LongestFrames = 31;
 
     private readonly Lock _lock = new();
@@ -49,14 +50,18 @@ internal sealed class StopWordListener(Func<short[], CancellationToken, Task<str
     }
 
     /// <returns><c>true</c> when the person said a stop word.</returns>
-    public async Task<bool> PushAsync(short[] frame, CancellationToken cancellationToken)
+    public async Task<bool> PushAsync(short[] frame, CancellationToken cancellationToken) =>
+        Push(frame) is { } pcm && await IsStopAsync(pcm, cancellationToken);
+
+    /// <summary>Hears the frame; returns the utterance once the person paused, to be checked off the audio loop with <see cref="IsStopAsync"/>.</summary>
+    public short[]? Push(short[] frame)
     {
         short[] pcm;
         lock (_lock)
         {
             if (_gate is null)
             {
-                return false;
+                return null;
             }
 
             if (_gate.IsUserSpeech(frame, clock() - _started))
@@ -66,7 +71,7 @@ internal sealed class StopWordListener(Func<short[], CancellationToken, Task<str
             }
             else if (_speechFrames == 0)
             {
-                return false;
+                return null;
             }
             else
             {
@@ -76,15 +81,24 @@ internal sealed class StopWordListener(Func<short[], CancellationToken, Task<str
             _heard.AddRange(frame);
             if (_quietFrames < PauseFrames && _heard.Count < LongestFrames * WakeWord.FrameSamples)
             {
-                return false;
+                return null;
             }
 
+            // A click or a single loud frame is not an utterance.
+            var enough = _speechFrames >= MinimumSpeechFrames;
             pcm = _heard.ToArray();
             Reset();
+            if (!enough)
+            {
+                return null;
+            }
         }
 
-        return StopWords.IsStop(await transcribe(pcm, cancellationToken));
+        return pcm;
     }
+
+    public async Task<bool> IsStopAsync(short[] pcm, CancellationToken cancellationToken) =>
+        StopWords.IsStop(await transcribe(pcm, cancellationToken));
 
     private void Reset()
     {

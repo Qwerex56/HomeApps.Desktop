@@ -27,6 +27,7 @@ internal sealed class Bridge(
     private bool _muted;
     private CancellationTokenSource _playing = new();
     private Task _playback = Task.CompletedTask;
+    private Task _stopCheck = Task.CompletedTask;
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {
@@ -93,10 +94,9 @@ internal sealed class Bridge(
 
                     break;
                 case BridgeState.Busy when stopWords is { Active: true }:
-                    if (await stopWords.PushAsync(frame, cancellationToken))
+                    if (stopWords.Push(frame) is { } heard && _stopCheck.IsCompleted)
                     {
-                        stopWords.End();
-                        await InterruptAsync(cancellationToken);
+                        _stopCheck = CheckStopWordAsync(stopWords, heard, _playing.Token, cancellationToken);
                     }
 
                     break;
@@ -310,6 +310,32 @@ internal sealed class Bridge(
             case BridgeState.Busy:
                 await InterruptAsync(cancellationToken);
                 break;
+        }
+    }
+
+    /// <summary>Off the gate (the transcription is slow): a stop word interrupts only if this playback is still the current one.</summary>
+    private async Task CheckStopWordAsync(StopWordListener listener, short[] heard, CancellationToken playing, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (await listener.IsStopAsync(heard, playing))
+            {
+                await UnderGateAsync(async () =>
+                {
+                    if (_state == BridgeState.Busy && !playing.IsCancellationRequested)
+                    {
+                        await InterruptAsync(cancellationToken);
+                    }
+                }, cancellationToken);
+            }
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or ObjectDisposedException)
+        {
+            // Interrupted or quitting.
+        }
+        catch (Exception exception)
+        {
+            output.Error("voice.engine_failed", exception.Message);
         }
     }
 
