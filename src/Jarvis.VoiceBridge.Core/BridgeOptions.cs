@@ -9,8 +9,8 @@ namespace Jarvis.VoiceBridge;
 /// <param name="Insecure">Accept the dev certificate of https://app.localhost.</param>
 /// <param name="SaveRecordings">V7: a folder where each turn's audio is kept, only on this computer.</param>
 /// <param name="CheckWake">A WAV file to score with the wake word, then exit (to tune the threshold).</param>
-/// <param name="Engine">S1: <c>--speech local --engine http://…</c>: an external speech engine (OpenAI audio API, e.g.
-/// Speaches); <c>null</c>: none.</param>
+/// <param name="Engine">S1: <c>--engine http://…</c>: an external speech engine (OpenAI audio API, e.g. Speaches) instead
+/// of the in-process Whisper and Piper (the default); <c>null</c>: none, unless <c>--speech server</c> (no local speech).</param>
 /// <param name="Actions">A JSON file with what this computer offers JARVIS (jarvis-satellites.md, S-0); <c>null</c>: nothing.</param>
 /// <param name="Pair">S-1e: a pairing code from the household's Urządzenia page; the bridge becomes that household's satellite.</param>
 /// <param name="Unpair">Forget the satellite's pairing on this computer; the bridge is the person's again.</param>

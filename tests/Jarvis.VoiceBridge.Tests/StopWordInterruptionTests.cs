@@ -88,4 +88,38 @@ public sealed class StopWordInterruptionTests
         await Wait.UntilAsync(() => bed.Speaker.Cancelled == 1, "the sound is cancelled");
         await Wait.UntilAsync(() => bed.Output.Last == BridgeStates.Idle, "idle after the interruption");
     }
+
+    [Fact]
+    public async Task A_slow_stop_check_of_one_turn_does_not_interrupt_the_next_turn()
+    {
+        await using var bed = new BridgeTestBed("stop");
+        await bed.SpeakToJarvisAsync();
+        await bed.FinishUtteranceAsync();
+        bed.Speaker.Block = true;
+        bed.Speaker.Hold = TimeSpan.FromMilliseconds(800);
+        var slow = new TaskCompletionSource();
+        bed.Speech.Gate = slow;
+
+        await bed.Server.SendAsync("""{"type":"audio","format":"wav"}""");
+        await bed.Server.SendBinaryAsync(FakeSpeechEngine.Silence());
+        await bed.Server.SendAsync("""{"type":"done"}""");
+        await Wait.UntilAsync(() => bed.Output.Last == BridgeStates.Speaking, "speaking");
+        bed.Mic.Push(Frames.For(TimeSpan.FromMilliseconds(400), Frames.Speech));
+        bed.Mic.Push(Frames.For(TimeSpan.FromSeconds(1), Frames.Quiet));
+        await Wait.UntilAsync(() => bed.Speech.Transcribed == 1, "the stop check of turn one is running");
+
+        await Wait.UntilAsync(() => bed.Output.Count(BridgeStates.Listening) == 2, "the follow-up window opens");
+        var thinking = bed.Output.Count(BridgeStates.Thinking);
+        var sent = bed.Server.Binary;
+        bed.Mic.Push(Frames.For(TimeSpan.FromSeconds(1), Frames.Speech));
+        await Wait.UntilAsync(() => bed.Server.Binary > sent, "follow-up audio");
+        bed.Mic.Push(Frames.For(TimeSpan.FromSeconds(1), Frames.Quiet));
+        await Wait.UntilAsync(() => bed.Output.Count(BridgeStates.Thinking) > thinking, "turn two is busy");
+
+        slow.SetResult();
+        await Wait.SettleAsync();
+
+        Assert.Equal(BridgeStates.Thinking, bed.Output.Last);
+        Assert.DoesNotContain(bed.Server.Texts, t => t.Contains("\"cancel\"", StringComparison.Ordinal));
+    }
 }

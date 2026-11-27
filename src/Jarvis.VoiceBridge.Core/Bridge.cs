@@ -127,6 +127,7 @@ internal sealed class Bridge(
     /// <summary>Under the gate: the chime, then everything the microphone hears goes to the server.</summary>
     private async Task BeginAsync(BridgeState state, CancellationToken cancellationToken)
     {
+        await StopPlayingAsync();
         _state = state;
         _speech = new EndOfSpeech(state is BridgeState.Answering or BridgeState.FollowUp ? FollowUpWindow.Length : WaitAfterWake);
         _recording = options.SaveRecordings is null ? null : [];
@@ -256,6 +257,8 @@ internal sealed class Bridge(
             return;
         }
 
+        // The turn is over: a slow stop-word check of it must not touch the next one.
+        await StopPlayingAsync();
         var cancelled = said.Flag("cancelled");
         if (_awaiting && !cancelled)
         {
@@ -322,7 +325,7 @@ internal sealed class Bridge(
             {
                 await UnderGateAsync(async () =>
                 {
-                    if (_state == BridgeState.Busy && !playing.IsCancellationRequested)
+                    if (_state == BridgeState.Busy && !playing.IsCancellationRequested && playing == _playing.Token)
                     {
                         await InterruptAsync(cancellationToken);
                     }
