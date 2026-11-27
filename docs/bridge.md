@@ -1,6 +1,8 @@
 # The JARVIS bridge
 
-`src/Jarvis.VoiceBridge` is a console app for the Mac (it also runs on Linux): it only listens for "Hey Jarvis"
+The bridge logic lives in the class library `src/Jarvis.VoiceBridge.Core`; `src/Jarvis.VoiceBridge` is the console app on top of it,
+and the desktop tray app (`src/HomeApps.Desktop`, see [desktop.md](desktop.md)) hosts the same Core in-process. The console app runs
+on the Mac (it also runs on Linux): it only listens for "Hey Jarvis"
 locally and carries sound, everything else happens on the HomeApps server (`/jarvis/voice`, `/devices/link`; see
 HomeApps `docs/jarvis.md` and `docs/devices.md` for the server side).
 

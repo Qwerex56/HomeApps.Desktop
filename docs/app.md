@@ -1,5 +1,7 @@
 # The JARVIS app (S-2c to S-2f)
 
+> Still present until stage D4 of the desktop rework; the new tray app is [desktop.md](desktop.md).
+
 `app/` is a Godot 4.7 project (GDScript, GL Compatibility): JARVIS's face on the computer. It does no listening or
 talking itself; it starts the bridge with `--ipc` ([bridge.md](bridge.md)) and shows what the bridge reports.
 
