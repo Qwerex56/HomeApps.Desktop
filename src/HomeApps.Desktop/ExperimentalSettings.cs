@@ -37,8 +37,16 @@ internal sealed class ExperimentalSettings(string path, INotifier popup)
             _enabled.Remove(id);
         }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, JsonSerializer.Serialize(_enabled.Order()));
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, JsonSerializer.Serialize(_enabled.Order()));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Not persisted; the choice stays in memory until the app restarts.
+        }
+
         return true;
     }
 
@@ -46,11 +54,15 @@ internal sealed class ExperimentalSettings(string path, INotifier popup)
     {
         try
         {
-            return File.Exists(path)
-                ? JsonSerializer.Deserialize<string[]>(File.ReadAllText(path))!.Where(VoiceBridgeHost.ExperimentalToolIds.Contains).ToHashSet()
-                : [];
+            if (!File.Exists(path))
+            {
+                return [];
+            }
+
+            var ids = JsonSerializer.Deserialize<string[]>(File.ReadAllText(path));
+            return ids is null ? [] : ids.Where(VoiceBridgeHost.ExperimentalToolIds.Contains).ToHashSet();
         }
-        catch (Exception exception) when (exception is JsonException or IOException or NullReferenceException)
+        catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
         {
             return [];
         }

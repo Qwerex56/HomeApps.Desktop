@@ -15,7 +15,7 @@ internal sealed class DeviceLink(BridgeOptions options, IAccessToken login, IRea
 
     private IReadOnlyList<ComputerAction> actions => [.. fileActions, .. experimental?.Invoke() ?? []];
 
-    /// <summary>The set of actions changed: drops the link so the next one announces the new list.</summary>
+    /// <summary>The set of actions changed: drops the link; the connection loop reconnects within up to 5 s and announces the new list.</summary>
     public void Reannounce() => _socket?.Abort();
 
     public async Task RunAsync(CancellationToken cancellationToken)
