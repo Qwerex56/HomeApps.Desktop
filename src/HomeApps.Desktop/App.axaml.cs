@@ -17,6 +17,7 @@ public sealed class App : Application, IDisposable
     private GlobalHotkey? _hotkey;
     private VoiceBridgeHost? _host;
     private ConfirmationNotifier? _notifier;
+    private readonly object _notifierLock = new();
     private readonly CancellationTokenSource _stop = new();
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
@@ -62,8 +63,13 @@ public sealed class App : Application, IDisposable
         {
             if (_host?.Api is { } api)
             {
-                _notifier ??= new ConfirmationNotifier(api, popup);
-                await _notifier.CheckAsync(_stop.Token);
+                ConfirmationNotifier notifier;
+                lock (_notifierLock)
+                {
+                    notifier = _notifier ??= new ConfirmationNotifier(api, popup);
+                }
+
+                await notifier.CheckAsync(_stop.Token);
             }
         }
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or OperationCanceledException)
