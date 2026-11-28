@@ -10,3 +10,6 @@ riderModule.iml
 build/
 
 .agents/runs/
+
+# Packaging output
+dist/

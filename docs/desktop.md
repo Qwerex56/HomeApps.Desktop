@@ -42,4 +42,5 @@ dotnet run --project src/HomeApps.Desktop
 - **Busy on another computer:** when the server reports that the turn is held by another computer of the same person,
   the app goes silent and idle at once.
 - **Playback:** `afplay` on macOS, PowerShell's `SoundPlayer` on Windows, `aplay` on Linux.
-- **Godot app:** retired (owner decision 2026-11-28); the `app/` folder and its packaging scripts are gone. Packaging the tray app is still missing.
+- **Godot app:** retired (owner decision 2026-11-28); the `app/` folder and its packaging scripts are gone. Packages are built from version tags (D5).
+- **Install:** release packages and autostart: [install.md](install.md).
