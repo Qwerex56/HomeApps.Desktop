@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3]
-
-[ext_resource type="Script" path="res://common/components/bridge_process/bridge_process.gd" id="1_bridge"]
-
-[node name="BridgeProcess" type="Node"]
-script = ExtResource("1_bridge")

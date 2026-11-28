@@ -9,7 +9,5 @@ JARVIS on a computer, next to (not part of) [HomeApps](../HomeApps): the voice b
 - `src/HomeApps.Desktop`: the Avalonia tray app (menu bar on macOS, system tray on Windows and Linux). It hosts the
   bridge in-process, shows its state in the tray icon, has the global mute hotkey, a conversation history window and on-screen Tak/Nie confirmations. See [docs/desktop.md](docs/desktop.md).
 - `tests/Jarvis.Desktop.Tests` and `tests/Jarvis.VoiceBridge.Tests`: tests (`dotnet test`).
-- `app/`: the Godot app (hologram window and menu-bar icon) that runs the bridge with `--ipc`. It is still here and
-  will be removed in stage D4 of the rework: [docs/app.md](docs/app.md).
 
 It talks to HomeApps only over HTTP and WebSocket, so it has no reference to HomeApps' code.
