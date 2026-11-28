@@ -49,5 +49,50 @@ public sealed class ExperimentalSettingsTests : IDisposable
         Assert.False(settings.IsOn("timer"));
     }
 
+    [Fact]
+    public async Task An_id_outside_the_six_is_refused_without_asking()
+    {
+        var popup = new Answer(true);
+        var settings = new ExperimentalSettings(Path.Combine(_dir, "e.json"), popup);
+
+        Assert.False(await settings.ChangeAsync("clipboard", true, CancellationToken.None));
+        Assert.Null(popup.Asked);
+        Assert.Empty(settings.Enabled);
+    }
+
+    [Fact]
+    public async Task Turning_off_a_confirmed_tool_removes_it_for_the_next_start()
+    {
+        var path = Path.Combine(_dir, "e.json");
+        var settings = new ExperimentalSettings(path, new Answer(true));
+        await settings.ChangeAsync("timer", true, CancellationToken.None);
+
+        Assert.True(await settings.ChangeAsync("timer", false, CancellationToken.None));
+
+        Assert.False(new ExperimentalSettings(path, new Answer(true)).IsOn("timer"));
+    }
+
+    [Fact]
+    public void Unknown_ids_in_the_file_are_ignored()
+    {
+        var path = Path.Combine(_dir, "e.json");
+        File.WriteAllText(path, """["volume","clipboard","screenshot"]""");
+
+        var settings = new ExperimentalSettings(path, new Answer(true));
+
+        Assert.Equal(["volume"], settings.Enabled);
+    }
+
+    [Theory]
+    [InlineData("not json")]
+    [InlineData("null")]
+    public void A_damaged_file_leaves_everything_off(string content)
+    {
+        var path = Path.Combine(_dir, "e.json");
+        File.WriteAllText(path, content);
+
+        Assert.Empty(new ExperimentalSettings(path, new Answer(true)).Enabled);
+    }
+
     public void Dispose() => Directory.Delete(_dir, true);
 }
