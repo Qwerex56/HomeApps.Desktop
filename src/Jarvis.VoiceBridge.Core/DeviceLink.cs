@@ -12,6 +12,8 @@ internal sealed class DeviceLink(BridgeOptions options, IAccessToken login, IRea
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly SemaphoreSlim _sending = new(1, 1);
     private readonly Dictionary<string, Task<(bool Ok, string Text)>> _runs = [];
+    private readonly Queue<string> _runOrder = new();
+    private const int MaxRemembered = 128;
     private ClientWebSocket? _socket;
 
     private IReadOnlyList<ComputerAction> actions => [.. fileActions, .. experimental?.Invoke() ?? []];
@@ -119,6 +121,11 @@ internal sealed class DeviceLink(BridgeOptions options, IAccessToken login, IRea
                 if (id is not null)
                 {
                     _runs[id] = run;
+                    _runOrder.Enqueue(id);
+                    if (_runOrder.Count > MaxRemembered)
+                    {
+                        _runs.Remove(_runOrder.Dequeue());
+                    }
                 }
             }
         }
