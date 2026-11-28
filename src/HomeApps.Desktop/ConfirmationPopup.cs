@@ -10,7 +10,7 @@ internal sealed class ConfirmationPopup : INotifier
 {
     public Task<bool?> AskAsync(ActionView action, CancellationToken cancellationToken)
     {
-        var answer = new TaskCompletionSource<bool?>();
+        var answer = new TaskCompletionSource<bool?>(TaskCreationOptions.RunContinuationsAsynchronously);
         Dispatcher.UIThread.Post(() =>
         {
             var window = new Window
@@ -36,6 +36,7 @@ internal sealed class ConfirmationPopup : INotifier
                     new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { yes, no } },
                 },
             };
+            cancellationToken.Register(() => Dispatcher.UIThread.Post(window.Close));
             window.Show();
         });
         return answer.Task.WaitAsync(cancellationToken);
