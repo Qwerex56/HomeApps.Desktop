@@ -85,4 +85,19 @@ public class HistoryViewTests
         var post = Assert.Single(server.Seen, s => s.Request.StartsWith("POST", StringComparison.Ordinal));
         Assert.Contains("kup mleko", post.Body, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task History_NeverDeletesAnything()
+    {
+        var server = Server();
+        server.Replies[$"POST /jarvis/api/v1/confirmations/{Action}"] = "{}";
+        var model = new HistoryModel(server.Api());
+        await model.SearchAsync("mleko", default);
+        await model.SelectAsync(model.Conversations[0], default);
+        await model.SendAsync("kup mleko", default);
+        await model.DecideAsync(Guid.Parse(Action), true, default);
+
+        Assert.NotEmpty(server.Seen);
+        Assert.DoesNotContain(server.Seen, s => s.Request.StartsWith("DELETE", StringComparison.Ordinal));
+    }
 }
