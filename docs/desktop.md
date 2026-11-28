@@ -30,10 +30,17 @@ dotnet run --project src/HomeApps.Desktop
   **Tak** and **Nie** stays on top of other windows. Closing it without an answer leaves the action pending, and it can be answered later in the history window ("czeka na potwierdzenie"). A spoken
   "tak" or "nie" is NOT an answer in the tray app: it is ignored, so the yes/no is always given on the screen (in the
   history window too). Native system notifications are deferred and not used yet.
+- **Experimental computer tools (2.10):** tray menu "Funkcje eksperymentalne" has six switches, all off by default: open an
+  app, open a page (https only), media control, "what is playing" (read-only), volume, timer/notification. A switch changes
+  only after you answer Tak in the confirmation window; the choice is kept in `~/.homeapps/desktop/experimental.json`.
+  A tool that is off is not announced to the server, so JARVIS does not see it; the server also refuses computer tools
+  for satellites and external clients (docs/jarvis.md in HomeApps). macOS uses `osascript`/`open`; Windows uses PowerShell
+  (media keys through `keybd_event`; "what is playing" reads Spotify's window title). No clipboard, screenshots or system
+  shortcuts. Windows is not tested on a real PC yet. Linux has none of these tools.
 - **Sign-in:** the app signs in to HomeApps as the first-party OAuth client `homeapps-desktop`; the browser asks for
   consent on the first run and the token is kept on this computer.
 - **Busy on another computer:** when the server reports that the turn is held by another computer of the same person,
   the app goes silent and idle at once.
 - **Playback:** `afplay` on macOS, PowerShell's `SoundPlayer` on Windows, `aplay` on Linux.
 - **Godot app:** the older Godot app in `app/` is still in the repo and works as described in [app.md](app.md); it
-  is removed in stage D4 of the rework.
+  stays until the owner confirms parity with the tray app.

@@ -7,6 +7,8 @@ public sealed class VoiceBridgeHost(Action<string> onState, Action? onConfirm = 
 
     private volatile Bridge? _bridge;
     private volatile bool _muted;
+    private volatile DeviceLink? _device;
+    private volatile IReadOnlyCollection<string> _experimental = [];
 
     /// <summary>Runs until <paramref name="cancellationToken"/> is cancelled. <paramref name="args"/> are the bridge's command-line options.</summary>
     public async Task RunAsync(string[] args, CancellationToken cancellationToken)
@@ -31,10 +33,10 @@ public sealed class VoiceBridgeHost(Action<string> onState, Action? onConfirm = 
         var clock = System.Diagnostics.Stopwatch.StartNew();
         var stopWords = speech is null ? null : new StopWordListener(speech.TranscribeAsync, () => clock.Elapsed);
         using var bridge = new Bridge(options, wake, login, link, microphone, new SystemSpeaker(), output, stopWords);
-        await using var device = options.Actions is not null || options.Link || login is SatelliteLogin
-            ? new DeviceLink(options, login, options.Actions is { } actions ? ComputerActions.Load(actions) : [])
-            : null;
-        var linked = device?.RunAsync(cancellationToken) ?? Task.CompletedTask;
+        await using var device = new DeviceLink(
+            options, login, options.Actions is { } actions ? ComputerActions.Load(actions) : [], () => ExperimentalTools.Actions(_experimental));
+        _device = device;
+        var linked = device.RunAsync(cancellationToken);
         _bridge = bridge;
         try
         {
@@ -49,6 +51,7 @@ public sealed class VoiceBridgeHost(Action<string> onState, Action? onConfirm = 
         finally
         {
             _bridge = null;
+            _device = null;
             _api = null;
             try
             {
@@ -70,4 +73,17 @@ public sealed class VoiceBridgeHost(Action<string> onState, Action? onConfirm = 
         _muted = mute;
         return _bridge?.SetMutedAsync(mute, cancellationToken) ?? Task.CompletedTask;
     }
+
+    /// <summary>The experimental computer tools (<see cref="ExperimentalTools.Ids"/>) JARVIS may see; all others stay hidden from him. Re-announced at once.</summary>
+    public void SetExperimentalTools(IReadOnlyCollection<string> ids)
+    {
+        _experimental = ids.Where(id => ExperimentalTools.Ids.Contains(id)).ToArray();
+        _device?.Reannounce();
+    }
+
+    /// <summary>The ids of the experimental tools, in the order the settings list them.</summary>
+    public static IReadOnlyList<string> ExperimentalToolIds => ExperimentalTools.Ids;
+
+    /// <summary>The settings label of an experimental tool.</summary>
+    public static string ExperimentalToolLabel(string id) => ExperimentalTools.Label(id);
 }

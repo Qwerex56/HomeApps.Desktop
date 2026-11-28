@@ -111,7 +111,26 @@ public sealed class App : Application, IDisposable
                 new HistoryWindow(api).Show();
             }
         };
-        tray.Menu = [history, muteItem, new NativeMenuItemSeparator(), quit];
+        var popup = new ConfirmationPopup();
+        var experimental = new ExperimentalSettings(ExperimentalSettings.DefaultPath, popup);
+        var features = new NativeMenu();
+        foreach (var id in VoiceBridgeHost.ExperimentalToolIds)
+        {
+            var item = new NativeMenuItem(VoiceBridgeHost.ExperimentalToolLabel(id)) { ToggleType = NativeMenuItemToggleType.CheckBox, IsChecked = experimental.IsOn(id) };
+            item.Click += async (_, _) =>
+            {
+                var on = !experimental.IsOn(id);
+                item.IsChecked = !on; // the native toggle flipped it; only a confirmed change stays
+                if (await experimental.ChangeAsync(id, on, _stop.Token))
+                {
+                    item.IsChecked = on;
+                    _host?.SetExperimentalTools(experimental.Enabled);
+                }
+            };
+            features.Items.Add(item);
+        }
+
+        tray.Menu = [history, muteItem, new NativeMenuItem("Funkcje eksperymentalne") { Menu = features }, new NativeMenuItemSeparator(), quit];
 
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         timer.Tick += (_, _) => _icons.Tick();
@@ -124,8 +143,8 @@ public sealed class App : Application, IDisposable
         _hotkey.Start();
 
         var icons = _icons;
-        var popup = new ConfirmationPopup();
         _host = new VoiceBridgeHost(state => Dispatcher.UIThread.Post(() => icons.SetState(state)), () => _ = AskConfirmationsAsync(popup));
+        _host.SetExperimentalTools(experimental.Enabled);
         _ = RunBridgeAsync(desktop.Args ?? []);
     }
 }
