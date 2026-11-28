@@ -13,7 +13,7 @@ namespace Jarvis.VoiceBridge;
 /// registers itself once, opens the browser for "Zezwól" with PKCE and a loopback redirect, and then lives on the
 /// refresh token. It shows up in "Połączone aplikacje", where it can be disconnected.
 /// </summary>
-internal sealed class OAuthLogin(HttpClient http, BridgeOptions options, TokenStore store, IBridgeOutput output) : IAccessToken
+internal sealed class OAuthLogin(HttpClient http, BridgeOptions options, TokenStore store, IBridgeOutput output) : IAccessToken, IDisposable
 {
     private const string ClientKey = "client_id";
     private const string RefreshKey = "refresh_token";
@@ -28,8 +28,22 @@ internal sealed class OAuthLogin(HttpClient http, BridgeOptions options, TokenSt
 
     private string? _access;
     private DateTimeOffset _expires;
+    private readonly SemaphoreSlim _gate = new(1, 1);
 
     public async Task<string> AccessTokenAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            return await AcquireAsync(cancellationToken);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async Task<string> AcquireAsync(CancellationToken cancellationToken)
     {
         if (_access is not null && _expires > DateTimeOffset.UtcNow.AddMinutes(1))
         {
@@ -57,6 +71,8 @@ internal sealed class OAuthLogin(HttpClient http, BridgeOptions options, TokenSt
         await SignInAsync(server, cancellationToken);
         return _access!;
     }
+
+    public void Dispose() => _gate.Dispose();
 
     public void Forget()
     {
