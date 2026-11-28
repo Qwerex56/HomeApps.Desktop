@@ -18,7 +18,7 @@ dotnet run --project src/HomeApps.Desktop
   other value is ignored and the system setting is used.
 - **Speech:** the app uses the bridge's defaults ([bridge.md](bridge.md)): speech is recognised and spoken on this
   computer (Whisper and Piper), so the audio never leaves it, and only text goes to the server. The models live in
-  `~/.homeapps/voice-bridge/models` and are not in git; they must be downloaded first, and Piper needs `espeak-ng` on
+  `~/.homeapps/voice-bridge/models` and are not in git (default Whisper model `ggml-small.bin`, ~466 MB, ~1 GB RAM; `ggml-medium.bin` is better but ~1.5 GB and slower, see docs/bridge.md); they must be downloaded first, and Piper needs `espeak-ng` on
   the `PATH` (Windows: install it and open a new session).
 - **Answers and follow-up:** after every answer the microphone stays open for 8 s without the wake word. While JARVIS
   speaks, only "stop" or "cisza" interrupts him, checked against the playback by a level gate (constants in

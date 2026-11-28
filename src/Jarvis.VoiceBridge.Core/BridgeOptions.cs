@@ -19,7 +19,7 @@ namespace Jarvis.VoiceBridge;
 /// <param name="SpeechLocal">D10, spec 2.1: speech is local by default: the audio never leaves this computer, the server only
 /// gets and gives text. Without <c>--engine</c> Whisper and Piper run inside the bridge; <c>--speech server</c> opts out
 /// (the server hears and speaks).</param>
-/// <param name="SttModelPath"><c>--stt-model</c>: the GGML Whisper file; default <c>ggml-base.bin</c> in the models folder.</param>
+/// <param name="SttModelPath"><c>--stt-model</c>: the GGML Whisper file; default <c>ggml-small.bin</c> in the models folder.</param>
 /// <param name="TtsModelPath"><c>--tts-model</c>: the Piper voice <c>.onnx</c> (its <c>.onnx.json</c> beside it); default
 /// <c>pl_PL-gosia-medium.onnx</c> in the models folder.</param>
 /// <param name="Link">S-2e: keep this computer on the Devices link even without actions, so it shows in Konto → Komputery.</param>
@@ -42,13 +42,15 @@ internal sealed record BridgeOptions(
     string? SttModelPath = null,
     string? TtsModelPath = null)
 {
+    public const string DefaultSttModelName = "ggml-small.bin";
+
     public const string SttModel = "deepdml/faster-whisper-large-v3-turbo-ct2";
     public const string TtsModel = "speaches-ai/piper-pl_PL-gosia-medium";
     public const string TtsVoice = "gosia";
 
     public bool LocalSpeech => SpeechLocal;
 
-    public string SttModelFile => SttModelPath ?? Path.Combine(Home, "models", "ggml-base.bin");
+    public string SttModelFile => SttModelPath ?? Path.Combine(Home, "models", DefaultSttModelName);
 
     public string TtsModelFile => TtsModelPath ?? Path.Combine(Home, "models", "pl_PL-gosia-medium.onnx");
 

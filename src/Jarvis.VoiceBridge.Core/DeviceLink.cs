@@ -11,6 +11,9 @@ internal sealed class DeviceLink(BridgeOptions options, IAccessToken login, IRea
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly SemaphoreSlim _sending = new(1, 1);
+    private readonly Dictionary<string, Task<(bool Ok, string Text)>> _runs = [];
+    private readonly Queue<string> _runOrder = new();
+    private const int MaxRemembered = 128;
     private ClientWebSocket? _socket;
 
     private IReadOnlyList<ComputerAction> actions => [.. fileActions, .. experimental?.Invoke() ?? []];
@@ -106,9 +109,28 @@ internal sealed class DeviceLink(BridgeOptions options, IAccessToken login, IRea
         JsonElement? input = message.TryGetProperty("input", out var given) ? given : null;
         var action = actions.FirstOrDefault(a => a.Name == name);
         Console.WriteLine($"» JARVIS: {name}");
-        var (ok, text) = action is null
-            ? (false, $"Nie znam akcji {name}.")
-            : await CommandRunner.RunAsync(action, input, cancellationToken);
+        // D16: one action id runs once; a redelivered frame (reconnect) gets the first run's result, never a second run.
+        Task<(bool Ok, string Text)> run;
+        lock (_runs)
+        {
+            if (id is null || !_runs.TryGetValue(id, out run!))
+            {
+                run = action is null
+                    ? Task.FromResult((false, $"Nie znam akcji {name}."))
+                    : CommandRunner.RunAsync(action, input, cancellationToken);
+                if (id is not null)
+                {
+                    _runs[id] = run;
+                    _runOrder.Enqueue(id);
+                    if (_runOrder.Count > MaxRemembered)
+                    {
+                        _runs.Remove(_runOrder.Dequeue());
+                    }
+                }
+            }
+        }
+
+        var (ok, text) = await run;
         await SendAsync(new { type = "action_result", id, ok, text }, cancellationToken);
     }
 

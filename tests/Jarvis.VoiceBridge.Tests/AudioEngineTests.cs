@@ -64,7 +64,7 @@ public sealed class AudioEngineTests
 
         Assert.True(options.LocalSpeech);
         Assert.Null(options.Engine);
-        Assert.EndsWith("ggml-base.bin", options.SttModelFile, StringComparison.Ordinal);
+        Assert.EndsWith("ggml-small.bin", options.SttModelFile, StringComparison.Ordinal);
         Assert.EndsWith("pl_PL-gosia-medium.onnx", options.TtsModelFile, StringComparison.Ordinal);
     }
 
@@ -88,5 +88,39 @@ public sealed class AudioEngineTests
         using var http = new HttpClient();
         var failure = Assert.Throws<FileNotFoundException>(() => SpeechEngines.Create(options, http));
         Assert.Contains("docs/bridge.md", failure.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_missing_default_Whisper_model_is_reported_with_the_exact_download_command()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), $"jarvis-models-{Guid.NewGuid():N}");
+        var stt = Path.Combine(folder, "ggml-small.bin");
+        var tts = Path.Combine(folder, "voice.onnx");
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(tts, "x");
+        File.WriteAllText(tts + ".json", "{}");
+        try
+        {
+            var options = BridgeOptions.Parse(["--speech", "local", "--stt-model", stt, "--tts-model", tts]);
+
+            using var http = new HttpClient();
+            var failure = Assert.Throws<FileNotFoundException>(() => SpeechEngines.Create(options, http));
+            Assert.Contains(stt, failure.Message, StringComparison.Ordinal);
+            Assert.Contains("curl -L --create-dirs -o", failure.Message, StringComparison.Ordinal);
+            Assert.Contains("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin", failure.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void The_Whisper_prompt_carries_the_home_vocabulary()
+    {
+        Assert.Contains("JARVIS", WhisperTranscriber.Prompt, StringComparison.Ordinal);
+        Assert.Contains("lista", WhisperTranscriber.Prompt, StringComparison.Ordinal);
+        Assert.Contains("plan", WhisperTranscriber.Prompt, StringComparison.Ordinal);
+        Assert.Contains("urządzenia", WhisperTranscriber.Prompt, StringComparison.Ordinal);
     }
 }

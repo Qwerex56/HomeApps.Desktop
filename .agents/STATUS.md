@@ -4,6 +4,7 @@
 | jarvis-desktop-rework | D2 | done (PR pending) | feat/jarvis-desktop-rework-d2 | ../HomeApps/specs/jarvis-desktop-rework-adr.md | 2026-11-27 |
 | jarvis-desktop-rework | D3 | done (PR pending) | feat/jarvis-desktop-rework-d3 | ../HomeApps/specs/jarvis-desktop-rework-adr.md | 2026-11-28 |
 | jarvis-desktop-rework | D4 | done (PR pending; Godot retired by owner decision 2026-11-28; packaging of the tray app is still missing now that package-*.sh are gone) | feat/jarvis-desktop-rework-d4 | ../HomeApps/specs/jarvis-desktop-rework-adr.md | 2026-11-28 |
+| jarvis-desktop-rework | D6 | done (PR pending) | feat/jarvis-desktop-rework-d6 | ../HomeApps/specs/jarvis-desktop-rework-adr.md | 2026-11-28 |
 | jarvis-desktop-rework | D5 | done (PR pending; release workflow not run on GitHub yet) | feat/jarvis-desktop-rework-d5 | ../HomeApps/specs/jarvis-desktop-rework-adr.md | 2026-11-28 |
 
 ## Decisions

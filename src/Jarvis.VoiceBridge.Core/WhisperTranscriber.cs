@@ -3,9 +3,12 @@ using Whisper.net;
 
 namespace Jarvis.VoiceBridge;
 
-/// <summary>D10: speech to text with a GGML Whisper model (tiny or base) through Whisper.net, in this process.</summary>
+/// <summary>D10: speech to text with a GGML Whisper model (small by default; tiny, base or medium via --stt-model) through Whisper.net, in this process.</summary>
 internal sealed class WhisperTranscriber : ITranscriber, IDisposable
 {
+    /// <summary>Home vocabulary the model is biased towards.</summary>
+    internal const string Prompt = "JARVIS, HomeApps, lista, plan, urządzenia, głośność, bateria.";
+
     private readonly WhisperFactory _factory;
     private readonly WhisperProcessor _processor;
     private readonly SemaphoreSlim _one = new(1, 1);
@@ -15,7 +18,7 @@ internal sealed class WhisperTranscriber : ITranscriber, IDisposable
         _factory = WhisperFactory.FromPath(modelPath);
         try
         {
-            _processor = _factory.CreateBuilder().WithLanguage("pl").Build();
+            _processor = _factory.CreateBuilder().WithLanguage("pl").WithPrompt(Prompt).Build();
         }
         catch
         {
