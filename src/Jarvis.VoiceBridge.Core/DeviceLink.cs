@@ -26,13 +26,13 @@ internal sealed class DeviceLink(BridgeOptions options, IAccessToken login, IRea
             {
                 await LinkAsync(cancellationToken);
             }
-            catch (Exception exception) when (exception is HttpRequestException or WebSocketException or JsonException or OperationCanceledException)
-            {
-                Console.WriteLine($"Akcje komputera: brak połączenia ({exception.Message}); próbuję za 5 s.");
-            }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 return;
+            }
+            catch (Exception exception) when (exception is HttpRequestException or WebSocketException or JsonException or OperationCanceledException)
+            {
+                Console.WriteLine($"Akcje komputera: brak połączenia ({exception.Message}); próbuję za 5 s.");
             }
 
             try
