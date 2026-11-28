@@ -20,7 +20,7 @@ internal sealed class JarvisApi(HttpClient http, Uri server, IAccessToken login)
     }
 
     public async Task<IReadOnlyList<MessageView>> MessagesAsync(Guid conversationId, CancellationToken cancellationToken) =>
-        await GetAsync<List<MessageView>>($"jarvis/api/conversations/{conversationId}/messages", cancellationToken);
+        await GetAsync<List<MessageView>>($"jarvis/api/v1/conversations/{conversationId}/messages", cancellationToken);
 
     public async Task<IReadOnlyList<ActionView>> PendingAsync(CancellationToken cancellationToken) =>
         await GetAsync<List<ActionView>>("jarvis/api/v1/confirmations?pending=true", cancellationToken);
@@ -35,7 +35,7 @@ internal sealed class JarvisApi(HttpClient http, Uri server, IAccessToken login)
 
     public async Task<ConversationView> StartConversationAsync(CancellationToken cancellationToken)
     {
-        using var request = await RequestAsync(HttpMethod.Post, "jarvis/api/conversations", cancellationToken);
+        using var request = await RequestAsync(HttpMethod.Post, "jarvis/api/v1/conversations", cancellationToken);
         request.Content = JsonContent.Create(new { title = (string?)null }, options: Json);
         return await SendAsync<ConversationView>(request, cancellationToken);
     }
@@ -43,7 +43,7 @@ internal sealed class JarvisApi(HttpClient http, Uri server, IAccessToken login)
     /// <summary>Sends a typed message and waits for the kept answer (the stream's <c>message</c> event); <c>error</c> throws.</summary>
     public async Task<MessageView> SendAsync(Guid conversationId, string text, CancellationToken cancellationToken)
     {
-        using var request = await RequestAsync(HttpMethod.Post, $"jarvis/api/conversations/{conversationId}/messages", cancellationToken);
+        using var request = await RequestAsync(HttpMethod.Post, $"jarvis/api/v1/conversations/{conversationId}/messages", cancellationToken);
         request.Content = JsonContent.Create(new { text }, options: Json);
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         response.EnsureSuccessStatusCode();

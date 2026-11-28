@@ -16,13 +16,13 @@ public class HistoryViewTests
         var server = new StubServer();
         server.Replies["GET /jarvis/api/v1/conversations"] = $$"""[{"id":"{{Conversation}}","title":"Dom","lastActivityAt":"2026-11-27T10:00:00+00:00"}]""";
         server.Replies["GET /jarvis/api/v1/conversations?q=mleko"] = server.Replies["GET /jarvis/api/v1/conversations"];
-        server.Replies[$"GET /jarvis/api/conversations/{Conversation}/messages"] = $$"""
+        server.Replies[$"GET /jarvis/api/v1/conversations/{Conversation}/messages"] = $$"""
             [{"id":"{{Guid.NewGuid()}}","role":"Person","text":"usun liste","sentAt":"2026-11-27T10:00:00+00:00","actions":[],"channel":"voice"},
              {"id":"{{Guid.NewGuid()}}","role":"Assistant","text":"Czekam","sentAt":"2026-11-27T10:00:05+00:00","channel":"voice",
               "actions":[{"id":"{{Action}}","tool":"todo.delete","description":"Usun liste","status":"NeedsConfirmation","confirmBy":null}]},
              {"id":"{{Guid.NewGuid()}}","role":"Person","text":"hej","sentAt":"2026-11-28T10:00:00+00:00","actions":[],"channel":"app"}]
             """;
-        server.Replies[$"POST /jarvis/api/conversations/{Conversation}/messages"] =
+        server.Replies[$"POST /jarvis/api/v1/conversations/{Conversation}/messages"] =
             $$"""
             event: text
             data: "Ok"
