@@ -7,7 +7,7 @@ JARVIS on a computer, next to (not part of) [HomeApps](../HomeApps): the voice b
 - `src/Jarvis.VoiceBridge`: the bridge as a console app on top of Core (`dotnet run`, `--ipc`, `--pair`, ...).
   How to run it: [docs/bridge.md](docs/bridge.md).
 - `src/HomeApps.Desktop`: the Avalonia tray app (menu bar on macOS, system tray on Windows and Linux). It hosts the
-  bridge in-process, shows its state in the tray icon, has the global mute hotkey, a conversation history window and on-screen Tak/Nie confirmations. See [docs/desktop.md](docs/desktop.md).
+  bridge in-process, shows its state in the tray icon, has the global mute hotkey, a conversation history window and on-screen Tak/Nie confirmations. See [docs/desktop.md](docs/desktop.md). Installing a release: [docs/install.md](docs/install.md).
 - `tests/Jarvis.Desktop.Tests` and `tests/Jarvis.VoiceBridge.Tests`: tests (`dotnet test`).
 
 It talks to HomeApps only over HTTP and WebSocket, so it has no reference to HomeApps' code.
