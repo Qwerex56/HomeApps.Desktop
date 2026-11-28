@@ -7,11 +7,16 @@ namespace Jarvis.VoiceBridge;
 /// This computer as a device of the person (jarvis-satellites.md 2a): a WebSocket to <c>/devices/link</c> that announces
 /// the <c>--actions</c> and runs what JARVIS asks for. Reconnects every 5 s while the bridge runs.
 /// </summary>
-internal sealed class DeviceLink(BridgeOptions options, IAccessToken login, IReadOnlyList<ComputerAction> actions) : IAsyncDisposable
+internal sealed class DeviceLink(BridgeOptions options, IAccessToken login, IReadOnlyList<ComputerAction> fileActions, Func<IReadOnlyList<ComputerAction>>? experimental = null) : IAsyncDisposable
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly SemaphoreSlim _sending = new(1, 1);
     private ClientWebSocket? _socket;
+
+    private IReadOnlyList<ComputerAction> actions => [.. fileActions, .. experimental?.Invoke() ?? []];
+
+    /// <summary>The set of actions changed: drops the link; the connection loop reconnects within up to 5 s and announces the new list.</summary>
+    public void Reannounce() => _socket?.Abort();
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {
@@ -21,13 +26,13 @@ internal sealed class DeviceLink(BridgeOptions options, IAccessToken login, IRea
             {
                 await LinkAsync(cancellationToken);
             }
-            catch (Exception exception) when (exception is HttpRequestException or WebSocketException or JsonException)
-            {
-                Console.WriteLine($"Akcje komputera: brak połączenia ({exception.Message}); próbuję za 5 s.");
-            }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 return;
+            }
+            catch (Exception exception) when (exception is HttpRequestException or WebSocketException or JsonException or OperationCanceledException)
+            {
+                Console.WriteLine($"Akcje komputera: brak połączenia ({exception.Message}); próbuję za 5 s.");
             }
 
             try
@@ -68,12 +73,13 @@ internal sealed class DeviceLink(BridgeOptions options, IAccessToken login, IRea
             Port = options.Server.Port,
         }.Uri;
         await _socket.ConnectAsync(uri, cancellationToken);
+        var announced = actions;
         await SendAsync(new
         {
             type = "hello",
             device = options.Device,
             kind = login.Kind,
-            actions = actions.Select(a => new { a.Name, a.Description, a.Input, a.ReadOnly, a.Confirm }),
+            actions = announced.Select(a => new { a.Name, a.Description, a.Input, a.ReadOnly, a.Confirm }),
         }, cancellationToken);
 
         while (await ReceiveAsync(_socket, cancellationToken) is { } message)
@@ -81,7 +87,7 @@ internal sealed class DeviceLink(BridgeOptions options, IAccessToken login, IRea
             switch (message.GetProperty("type").GetString())
             {
                 case "ready":
-                    Console.WriteLine($"Akcje komputera: {actions.Count} gotowe dla JARVIS-a.");
+                    Console.WriteLine($"Akcje komputera: {announced.Count} gotowe dla JARVIS-a.");
                     break;
                 case "error":
                     Console.WriteLine($"Akcje komputera odrzucone: {Text(message, "code")} {Text(message, "text")}".TrimEnd());

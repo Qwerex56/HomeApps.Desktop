@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace Jarvis.VoiceBridge;
 
-/// <summary>Runs an action's command with <c>/bin/sh -c</c>; the input arrives as environment variables, never in the command text.</summary>
+/// <summary>Runs an action's command with <c>/bin/sh -c</c> (or PowerShell); the input arrives as environment variables, never in the command text.</summary>
 internal static class CommandRunner
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
@@ -11,11 +11,11 @@ internal static class CommandRunner
 
     public static async Task<(bool Ok, string Text)> RunAsync(ComputerAction action, JsonElement? input, CancellationToken cancellationToken)
     {
-        var start = new ProcessStartInfo("/bin/sh", ["-c", action.Run])
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
+        var start = action.PowerShell
+            ? new ProcessStartInfo("powershell", ["-NoProfile", "-NonInteractive", "-Command", action.Run])
+            : new ProcessStartInfo("/bin/sh", ["-c", action.Run]);
+        start.RedirectStandardOutput = true;
+        start.RedirectStandardError = true;
         start.Environment["JARVIS_INPUT"] = input?.GetRawText() ?? "{}";
         if (input is { ValueKind: JsonValueKind.Object } fields)
         {
