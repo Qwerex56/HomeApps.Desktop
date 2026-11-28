@@ -260,7 +260,14 @@ internal sealed class Bridge(
         // The turn is over: a slow stop-word check of it must not touch the next one.
         await StopPlayingAsync();
         var cancelled = said.Flag("cancelled");
-        if (_awaiting && !cancelled)
+        if (_awaiting && !cancelled && options.Hosted)
+        {
+            // D8: the answer is a click on the notification; the usual follow-up window follows, and a bare "tak"/"nie" is dropped.
+            output.Confirm();
+            _awaiting = false;
+            await BeginAsync(BridgeState.FollowUp, cancellationToken);
+        }
+        else if (_awaiting && !cancelled)
         {
             output.Confirm();
             await BeginAsync(BridgeState.Answering, cancellationToken);

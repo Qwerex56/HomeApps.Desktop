@@ -19,6 +19,11 @@ internal sealed class OAuthLogin(HttpClient http, BridgeOptions options, TokenSt
     private const string RefreshKey = "refresh_token";
     private const string Callback = "/callback";
 
+    /// <summary>The tray app signs in as the static first-party Auth client (docs/jarvis.md "Desktop OAuth contract"): the token's audience is <c>homeapps</c>, which the confirmations accept (D9).</summary>
+    public const string FirstPartyClient = "homeapps-desktop";
+
+    public const string FirstPartyResource = "homeapps";
+
     public string Kind => "computer";
 
     private string? _access;
@@ -32,14 +37,14 @@ internal sealed class OAuthLogin(HttpClient http, BridgeOptions options, TokenSt
         }
 
         var server = await DiscoverAsync(cancellationToken);
-        if (store.Read(RefreshKey) is { } refresh && store.Read(ClientKey) is { } client)
+        if (store.Read(RefreshKey) is { } refresh && ClientId() is { } client)
         {
             var refreshed = await TokenAsync(server, new()
             {
                 ["grant_type"] = "refresh_token",
                 ["refresh_token"] = refresh,
                 ["client_id"] = client,
-                ["resource"] = server.Resource,
+                ["resource"] = ResourceOf(server),
             }, cancellationToken);
             if (refreshed)
             {
@@ -63,13 +68,13 @@ internal sealed class OAuthLogin(HttpClient http, BridgeOptions options, TokenSt
     {
         var port = FreePort();
         var redirect = $"http://127.0.0.1:{port}{Callback}";
-        var client = store.Read(ClientKey) ?? await RegisterAsync(server, cancellationToken);
+        var client = ClientId() ?? await RegisterAsync(server, cancellationToken);
         var verifier = Base64Url(RandomNumberGenerator.GetBytes(32));
         var challenge = Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(verifier)));
         var state = Base64Url(RandomNumberGenerator.GetBytes(16));
         var authorize = $"{server.Authorize}?response_type=code&client_id={Uri.EscapeDataString(client)}"
             + $"&redirect_uri={Uri.EscapeDataString(redirect)}&code_challenge={challenge}&code_challenge_method=S256"
-            + $"&state={state}&scope=homeapps&resource={Uri.EscapeDataString(server.Resource)}";
+            + $"&state={state}{(options.Hosted ? string.Empty : "&scope=homeapps")}&resource={Uri.EscapeDataString(ResourceOf(server))}";
 
         using var listener = new HttpListener();
         listener.Prefixes.Add($"http://127.0.0.1:{port}/");
@@ -98,7 +103,7 @@ internal sealed class OAuthLogin(HttpClient http, BridgeOptions options, TokenSt
             ["redirect_uri"] = redirect,
             ["client_id"] = client,
             ["code_verifier"] = verifier,
-            ["resource"] = server.Resource,
+            ["resource"] = ResourceOf(server),
         }, cancellationToken);
         if (!signedIn)
         {
@@ -163,6 +168,10 @@ internal sealed class OAuthLogin(HttpClient http, BridgeOptions options, TokenSt
             new Uri(auth["token_endpoint"]!.GetValue<string>()),
             new Uri(auth["registration_endpoint"]!.GetValue<string>()));
     }
+
+    private string? ClientId() => options.Hosted ? FirstPartyClient : store.Read(ClientKey);
+
+    private string ResourceOf(Server server) => options.Hosted ? FirstPartyResource : server.Resource;
 
     private static int FreePort()
     {

@@ -1,8 +1,10 @@
 namespace Jarvis.VoiceBridge;
 
 /// <summary>Runs the bridge inside another app (the tray app) and reports its states; the only public surface of Core.</summary>
-public sealed class VoiceBridgeHost(Action<string> onState)
+public sealed class VoiceBridgeHost(Action<string> onState, Action? onConfirm = null)
 {
+    private volatile JarvisApi? _api;
+
     private volatile Bridge? _bridge;
     private volatile bool _muted;
 
@@ -10,7 +12,7 @@ public sealed class VoiceBridgeHost(Action<string> onState)
     public async Task RunAsync(string[] args, CancellationToken cancellationToken)
     {
         var options = BridgeOptions.Parse(args) with { Hosted = true };
-        var output = new HostedOutput(onState);
+        var output = new HostedOutput(onState, onConfirm);
         using var http = new HttpClient(new HttpClientHandler
         {
             ServerCertificateCustomValidationCallback = (_, _, _, errors) => options.AcceptsCertificate(errors),
@@ -19,6 +21,7 @@ public sealed class VoiceBridgeHost(Action<string> onState)
         var person = new OAuthLogin(http, options, store, output);
         var satellite = new SatelliteLogin(http, options, store);
         IAccessToken login = SatelliteLogin.IsPaired(store) ? satellite : person;
+        _api = new JarvisApi(http, options.Server, person);
 
         using var wake = new WakeWord(await ModelFiles.EnsureAsync(http, cancellationToken));
         using var microphone = new Microphone();
@@ -46,6 +49,7 @@ public sealed class VoiceBridgeHost(Action<string> onState)
         finally
         {
             _bridge = null;
+            _api = null;
             try
             {
                 await linked;
@@ -56,6 +60,9 @@ public sealed class VoiceBridgeHost(Action<string> onState)
             }
         }
     }
+
+    /// <summary>The REST API as the signed-in person while the bridge runs (history, confirmations); null before.</summary>
+    internal JarvisApi? Api => _api;
 
     /// <summary>Mutes or unmutes the microphone; before the bridge runs, the choice is applied when it starts.</summary>
     public Task SetMutedAsync(bool mute, CancellationToken cancellationToken = default)
