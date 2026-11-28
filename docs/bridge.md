@@ -17,7 +17,7 @@ dotnet run --project src/Jarvis.VoiceBridge -- --server https://home-apps.dev --
   `--logout` forgets it on this Mac.
 - **Using it:** "Hey Jarvis" (a rising chime) → say the request → after ~0.7 s of quiet a falling chime, the transcript
   and JARVIS's answer are printed and spoken (`afplay`). When he asks to confirm, a chime and 8 s for "tak" / "nie"
-  without the wake word. Enter starts without the wake word, ends the utterance early, or stops JARVIS mid-answer;
+  without the wake word (console only: the tray app answers on screen, see [desktop.md](desktop.md)). Enter starts without the wake word, ends the utterance early, or stops JARVIS mid-answer;
   `q` quits. While he speaks the microphone is ignored, except for "stop" / "cisza" with local speech (see below); Enter always interrupts him.
 - **Tuning:** `--threshold` (0.5) is the wake word's score. `--save-recordings <folder>` keeps each turn as a WAV on
   this Mac only (V7); `--check-wake <file.wav>` prints the best score in a 16 kHz recording, e.g. one of yours, to pick a

@@ -136,8 +136,9 @@ internal sealed partial class VoiceLink(BridgeOptions options, ISpeechEngine? sp
         try
         {
             var text = heard.Length == 0 ? string.Empty : await local.TranscribeAsync(heard, cancellationToken);
-            if (text.Length == 0)
+            if (text.Length == 0 || (options.Hosted && VoiceAnswers.IsYesNo(text)))
             {
+                text = string.Empty;
                 await LocalEventAsync(new { type = "transcript", text }, cancellationToken);
                 await LocalEventAsync(new { type = "done" }, cancellationToken);
                 return;

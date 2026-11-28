@@ -23,6 +23,15 @@ dotnet run --project src/HomeApps.Desktop
 - **Answers and follow-up:** after every answer the microphone stays open for 8 s without the wake word. While JARVIS
   speaks, only "stop" or "cisza" interrupts him, checked against the playback by a level gate (constants in
   `EchoGate.cs`; change them and rebuild).
+- **Tray menu:** "Historia rozmów" opens the history window (title "JARVIS: historia rozmów"): the conversations on
+  the left, messages on the right. Filters: the search box (Enter, searches the server), the day picker, and the channel
+  (all, voice, text, computer); "Wyczyść filtry" resets them. The window can also send a message to JARVIS.
+- **Confirmations (D8):** when JARVIS asks to confirm an action, a small window "JARVIS prosi o potwierdzenie" with
+  **Tak** and **Nie** stays on top of other windows. Closing it without an answer leaves the action pending, and it can be answered later in the history window ("czeka na potwierdzenie"). A spoken
+  "tak" or "nie" is NOT an answer in the tray app: it is ignored, so the yes/no is always given on the screen (in the
+  history window too). Native system notifications are deferred and not used yet.
+- **Sign-in:** the app signs in to HomeApps as the first-party OAuth client `homeapps-desktop`; the browser asks for
+  consent on the first run and the token is kept on this computer.
 - **Busy on another computer:** when the server reports that the turn is held by another computer of the same person,
   the app goes silent and idle at once.
 - **Playback:** `afplay` on macOS, PowerShell's `SoundPlayer` on Windows, `aplay` on Linux.

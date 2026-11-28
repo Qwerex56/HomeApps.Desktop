@@ -3,7 +3,7 @@ using System.Diagnostics;
 namespace Jarvis.VoiceBridge;
 
 /// <summary>The bridge inside the tray app: states go to the app, the sign-in page opens in the browser, the rest is logged to stderr.</summary>
-internal sealed class HostedOutput(Action<string> onState) : IBridgeOutput
+internal sealed class HostedOutput(Action<string> onState, Action? onConfirm = null) : IBridgeOutput
 {
     public void State(string state) => onState(state);
 
@@ -15,9 +15,8 @@ internal sealed class HostedOutput(Action<string> onState) : IBridgeOutput
 
     public void Reply(string text, IReadOnlyList<ReplyAction> actions) => Console.Error.WriteLine($"JARVIS: {text}");
 
-    public void Confirm()
-    {
-    }
+    /// <summary>An action waits for a yes or no: the tray app asks on the screen (D8), never by voice.</summary>
+    public void Confirm() => onConfirm?.Invoke();
 
     public void Error(string? code, string? detail) => Console.Error.WriteLine($"Błąd serwera: {code} {detail}".TrimEnd());
 

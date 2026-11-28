@@ -16,6 +16,8 @@ public sealed class App : Application, IDisposable
     private MuteSwitch? _mute;
     private GlobalHotkey? _hotkey;
     private VoiceBridgeHost? _host;
+    private ConfirmationNotifier? _notifier;
+    private readonly object _notifierLock = new();
     private readonly CancellationTokenSource _stop = new();
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
@@ -54,6 +56,28 @@ public sealed class App : Application, IDisposable
         }
     }
 
+    /// <summary>JARVIS waits for a yes or no (2.4): the system asks on the screen; the answer goes to the server.</summary>
+    private async Task AskConfirmationsAsync(INotifier popup)
+    {
+        try
+        {
+            if (_host?.Api is { } api)
+            {
+                ConfirmationNotifier notifier;
+                lock (_notifierLock)
+                {
+                    notifier = _notifier ??= new ConfirmationNotifier(api, popup);
+                }
+
+                await notifier.CheckAsync(_stop.Token);
+            }
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or OperationCanceledException)
+        {
+            Console.Error.WriteLine($"Potwierdzenie: {exception.Message}");
+        }
+    }
+
     private void StartTray(IClassicDesktopStyleApplicationLifetime desktop)
     {
         var tray = new TrayIcon { ToolTipText = "JARVIS" };
@@ -79,7 +103,15 @@ public sealed class App : Application, IDisposable
             _hotkey?.Dispose();
             _hotkey = null;
         };
-        tray.Menu = [muteItem, new NativeMenuItemSeparator(), quit];
+        var history = new NativeMenuItem("Historia rozmów");
+        history.Click += (_, _) =>
+        {
+            if (_host?.Api is { } api)
+            {
+                new HistoryWindow(api).Show();
+            }
+        };
+        tray.Menu = [history, muteItem, new NativeMenuItemSeparator(), quit];
 
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         timer.Tick += (_, _) => _icons.Tick();
@@ -92,7 +124,8 @@ public sealed class App : Application, IDisposable
         _hotkey.Start();
 
         var icons = _icons;
-        _host = new VoiceBridgeHost(state => Dispatcher.UIThread.Post(() => icons.SetState(state)));
+        var popup = new ConfirmationPopup();
+        _host = new VoiceBridgeHost(state => Dispatcher.UIThread.Post(() => icons.SetState(state)), () => _ = AskConfirmationsAsync(popup));
         _ = RunBridgeAsync(desktop.Args ?? []);
     }
 }
