@@ -64,7 +64,7 @@ public sealed class AudioEngineTests
 
         Assert.True(options.LocalSpeech);
         Assert.Null(options.Engine);
-        Assert.EndsWith("ggml-base.bin", options.SttModelFile, StringComparison.Ordinal);
+        Assert.EndsWith("ggml-small.bin", options.SttModelFile, StringComparison.Ordinal);
         Assert.EndsWith("pl_PL-gosia-medium.onnx", options.TtsModelFile, StringComparison.Ordinal);
     }
 

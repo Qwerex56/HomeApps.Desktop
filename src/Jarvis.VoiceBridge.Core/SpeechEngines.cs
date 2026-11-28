@@ -21,8 +21,11 @@ internal static class SpeechEngines
         {
             if (!File.Exists(file))
             {
+                var hint = file == options.SttModelFile
+                    ? $" Download it: curl -L --create-dirs -o \"{file}\" https://huggingface.co/ggerganov/whisper.cpp/resolve/main/{Path.GetFileName(file)}"
+                    : string.Empty;
                 throw new FileNotFoundException(
-                    $"Speech model missing: {file}. Download it as described in docs/bridge.md (\"Speech without Speaches\"), or set --stt-model / --tts-model.");
+                    $"Speech model missing: {file}.{hint} See docs/bridge.md (\"Speech without Speaches\"), or set --stt-model / --tts-model.");
             }
         }
 

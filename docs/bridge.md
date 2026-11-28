@@ -89,17 +89,28 @@ The models are large and are NOT in git. Put them in `~/.homeapps/voice-bridge/m
 
 | File | Where from |
 |---|---|
-| `ggml-base.bin` (or `ggml-tiny.bin`, then `--stt-model`) | `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin` |
+| `ggml-small.bin` (default; `--stt-model` picks another) | `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin` |
 | `pl_PL-gosia-medium.onnx` and `pl_PL-gosia-medium.onnx.json` | `https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/gosia/medium/` |
 
 Download example (macOS / Linux):
 
 ```bash
 mkdir -p ~/.homeapps/voice-bridge/models && cd ~/.homeapps/voice-bridge/models
-curl -LO https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
+curl -LO https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
 curl -LO https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/gosia/medium/pl_PL-gosia-medium.onnx
 curl -LO https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/gosia/medium/pl_PL-gosia-medium.onnx.json
 ```
+
+Whisper model choice (multilingual, language is forced to Polish, and a prompt with the home vocabulary biases it):
+
+| Model | Size | RAM | CPU cost per short command |
+|---|---|---|---|
+| `ggml-base.bin` | ~142 MB | ~0.5 GB | fast, but poor Polish (too small) |
+| `ggml-small.bin` (default) | ~466 MB | ~1 GB | about 1-3 s on a recent laptop CPU |
+| `ggml-medium.bin` (better, heavier) | ~1.5 GB | ~2.5 GB | about 4-10 s on CPU; use on a strong machine |
+
+Link: `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/<name>`. Switch with `--stt-model <path>`. Figures are
+approximate and were not measured here. A missing model stops the bridge with the exact `curl` command to fetch it.
 
 Piper needs phonemes from the `espeak-ng` program, which the bridge starts itself, so it must be installed and on the
 `PATH`: macOS `brew install espeak-ng`, Linux `apt install espeak-ng`, Windows install the espeak-ng package and make
