@@ -43,6 +43,7 @@ public sealed class ActionRunsOnceTests
             await Wait.UntilAsync(() => server.Texts.Any(t => t.Contains("\"hello\"", StringComparison.Ordinal)), "hello");
             await server.SendAsync("""{"type":"action","id":"a2","name":"mark"}""");
             await server.SendAsync("""{"type":"action","id":"a2","name":"mark"}""");
+            await Wait.UntilAsync(() => server.Texts.Count(t => t.Contains("\"action_result\"", StringComparison.Ordinal)) == 2, "two a2 results");
             await server.SendAsync("""{"type":"action","id":"a3","name":"mark"}""");
             await Wait.UntilAsync(() => server.Texts.Count(t => t.Contains("\"action_result\"", StringComparison.Ordinal)) == 3, "three results");
 
