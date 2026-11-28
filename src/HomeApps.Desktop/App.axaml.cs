@@ -117,14 +117,29 @@ public sealed class App : Application, IDisposable
         foreach (var id in VoiceBridgeHost.ExperimentalToolIds)
         {
             var item = new NativeMenuItem(VoiceBridgeHost.ExperimentalToolLabel(id)) { ToggleType = NativeMenuItemToggleType.CheckBox, IsChecked = experimental.IsOn(id) };
+            var pending = false;
             item.Click += async (_, _) =>
             {
-                var on = !experimental.IsOn(id);
-                item.IsChecked = !on; // the native toggle flipped it; only a confirmed change stays
-                if (await experimental.ChangeAsync(id, on, _stop.Token))
+                if (pending)
                 {
-                    item.IsChecked = on;
-                    _host?.SetExperimentalTools(experimental.Enabled);
+                    item.IsChecked = experimental.IsOn(id);
+                    return;
+                }
+
+                pending = true;
+                try
+                {
+                var on = !experimental.IsOn(id);
+                    item.IsChecked = !on; // the native toggle flipped it; only a confirmed change stays
+                    if (await experimental.ChangeAsync(id, on, _stop.Token))
+                    {
+                        item.IsChecked = on;
+                        _host?.SetExperimentalTools(experimental.Enabled);
+                    }
+                }
+                finally
+                {
+                    pending = false;
                 }
             };
             features.Items.Add(item);

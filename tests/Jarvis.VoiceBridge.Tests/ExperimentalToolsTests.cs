@@ -12,6 +12,14 @@ public sealed class ExperimentalToolsTests
         Assert.Empty(ExperimentalTools.Actions([], "windows"));
     }
 
+    [Fact]
+    public void Windows_timer_has_no_double_quotes_in_the_child_command_and_volume_guards_low_levels()
+    {
+        var actions = ExperimentalTools.Actions(["timer", "volume"], "windows");
+        Assert.DoesNotContain('"', actions.Single(a => a.Name == "timer").Run);
+        Assert.Contains("if ($l -ge 2) { 1..[int]($l / 2)", actions.Single(a => a.Name == "volume").Run);
+    }
+
     [Theory]
     [InlineData("macos", false)]
     [InlineData("windows", true)]
