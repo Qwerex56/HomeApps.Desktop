@@ -25,16 +25,3 @@ internal sealed class StubServer : HttpMessageHandler
         return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, key.Contains("/messages", StringComparison.Ordinal) && key.StartsWith("POST", StringComparison.Ordinal) ? "text/event-stream" : "application/json") };
     }
 }
-
-internal sealed class FakeToken : IAccessToken
-{
-    public const string Value = "homeapps-token";
-
-    public string Kind => "computer";
-
-    public Task<string> AccessTokenAsync(CancellationToken cancellationToken) => Task.FromResult(Value);
-
-    public void Forget()
-    {
-    }
-}
